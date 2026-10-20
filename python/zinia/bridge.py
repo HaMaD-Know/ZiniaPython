@@ -88,7 +88,7 @@ def runtime_info() -> dict:
         "machine": platform.machine(),
         "ios": ios_ver,
         "prefix": sys.prefix,
-        "stdlib": os.path.dirname(os.__file__),
+        "stdlib": errors.stdlib_dir(),
         "sysPath": list(sys.path),
         "sitePackages": packages.Config.site_dir,
         "bundledPackages": list(packages.Config.bundled_dirs),

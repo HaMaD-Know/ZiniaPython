@@ -98,3 +98,21 @@ class SelfTestTests(unittest.TestCase):
         failed = [c for c in report["cases"] if not c["passed"]]
         self.assertEqual(failed, [], json.dumps(failed, indent=2))
         self.assertEqual(report["summary"]["requiredModulesMissing"], [])
+
+
+class FrozenStdlibTests(unittest.TestCase):
+    """CPython's embedded iOS build freezes os; frozen modules have no __file__."""
+
+    def test_runtime_works_when_os_has_no_file(self):
+        import importlib
+        import os as os_module
+        from zinia import errors
+        saved = os_module.__dict__.pop("__file__", None)
+        try:
+            reloaded = importlib.reload(errors)
+            self.assertTrue(os.path.isdir(reloaded.stdlib_dir()))
+            self.assertIn("stdlib", bridge.runtime_info())
+        finally:
+            if saved is not None:
+                os_module.__file__ = saved
+            importlib.reload(errors)

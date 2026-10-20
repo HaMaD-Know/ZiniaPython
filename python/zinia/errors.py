@@ -12,6 +12,26 @@ from . import module_info
 _PACKAGE_DIR = os.path.normcase(os.path.dirname(os.path.abspath(__file__))) + os.sep
 
 
+def stdlib_dir() -> str:
+    """Folder of the standard library.
+
+    Not ``os.__file__``: in CPython's embedded iOS build ``os`` and other core
+    modules are frozen into the interpreter and have no ``__file__``.
+    """
+    try:
+        path = sysconfig.get_path("stdlib")
+        if path and os.path.isdir(path):
+            return path
+    except Exception:  # noqa: BLE001
+        pass
+    for name in ("json", "email", "logging"):  # packages, never frozen
+        module = sys.modules.get(name) or __import__(name)
+        file = getattr(module, "__file__", None)
+        if file:
+            return os.path.dirname(os.path.dirname(os.path.abspath(file)))
+    return sys.prefix
+
+
 def _stdlib_dirs() -> tuple[str, ...]:
     dirs = set()
     for key in ("stdlib", "platstdlib", "purelib", "platlib"):
@@ -21,8 +41,7 @@ def _stdlib_dirs() -> tuple[str, ...]:
             path = None
         if path:
             dirs.add(os.path.normcase(os.path.abspath(path)) + os.sep)
-    for path in (os.path.dirname(os.__file__),):
-        dirs.add(os.path.normcase(os.path.abspath(path)) + os.sep)
+    dirs.add(os.path.normcase(os.path.abspath(stdlib_dir())) + os.sep)
     return tuple(dirs)
 
 
