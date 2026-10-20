@@ -63,13 +63,10 @@ jobs:
         run: npm ci
 
       - name: Lint, type check and frontend tests
-        run: |
-          npm run lint
-          npm run typecheck
-          npm test
+        run: bash scripts/ci/run-annotated.sh frontend-checks bash -c "npm run lint && npm run typecheck && npm test"
 
       - name: Runtime engine tests (desktop CPython 3.14)
-        run: python -I python/tests/run_tests.py
+        run: bash scripts/ci/run-annotated.sh runtime-tests python -I python/tests/run_tests.py
 
       - name: Build web assets and sync the iOS project
         run: |
@@ -77,7 +74,7 @@ jobs:
           npx cap sync ios
 
       - name: Check iOS project wiring
-        run: npm run check:ios
+        run: bash scripts/ci/run-annotated.sh check-ios npm run check:ios
 
       - uses: actions/cache@v6
         with:
@@ -85,7 +82,7 @@ jobs:
           key: python-runtime-${{ hashFiles('python-runtime/runtime.lock.json') }}
 
       - name: Fetch pinned CPython iOS framework
-        run: bash scripts/fetch-python-runtime.sh
+        run: bash scripts/ci/run-annotated.sh fetch-runtime bash scripts/fetch-python-runtime.sh
 
       - name: Verify framework architectures
         run: |
@@ -109,7 +106,7 @@ jobs:
 
       - name: Verify simulator app bundle
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_selftest }}
-        run: bash scripts/ci/verify-app-bundle.sh build/sim/Build/Products/Debug-iphonesimulator/App.app simulator
+        run: bash scripts/ci/run-annotated.sh verify-simulator-bundle bash scripts/ci/verify-app-bundle.sh build/sim/Build/Products/Debug-iphonesimulator/App.app simulator
 
       - name: Embedded Python self-test on the Simulator
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_selftest }}
@@ -124,7 +121,7 @@ jobs:
             ARCHS=arm64 CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 
       - name: Verify device app bundle
-        run: bash scripts/ci/verify-app-bundle.sh build/device/Build/Products/Release-iphoneos/App.app device
+        run: bash scripts/ci/run-annotated.sh verify-device-bundle bash scripts/ci/verify-app-bundle.sh build/device/Build/Products/Release-iphoneos/App.app device
 
       - name: Package unsigned IPA
         run: bash scripts/ci/package-ipa.sh build/device/Build/Products/Release-iphoneos/App.app build/artifacts/ZiniaPython-unsigned.ipa

@@ -38,10 +38,18 @@ import sys
 
 log, out = sys.argv[1], sys.argv[2]
 text = open(log, encoding="utf-8", errors="replace").read()
+
+
+def annotate(level, title, body):
+    # Annotations are readable through the public API (job logs are not).
+    body = body[-3800:].replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print(f"::{level} title={title}::{body}")
+
+
 begin, end = "=====ZINIA-SELFTEST-BEGIN=====", "=====ZINIA-SELFTEST-END====="
 if begin not in text or end not in text:
-    print("::error::The self-test report was not found in the simulator output.")
     print(text[-4000:])
+    annotate("error", "Simulator self-test", "The self-test report was not found in the simulator output.\n" + text[-3000:])
     sys.exit(1)
 report = json.loads(text.split(begin, 1)[1].split(end, 1)[0])
 with open(out, "w") as fh:
@@ -49,17 +57,23 @@ with open(out, "w") as fh:
 selftest = report.get("selftest") or {}
 summary = selftest.get("summary", {})
 runtime = report.get("runtime") or {}
-print("Python %s on %s (%s)" % (runtime.get("pythonVersion"), runtime.get("platform"), runtime.get("machine")))
-print("Initialized: %s, start-up %.0f ms" % (report.get("initialized"), runtime.get("startupMs") or 0))
-print("Missing-runtime diagnostic detected: %s" % (report.get("missingRuntimeDiagnostic") or {}).get("detected"))
+lines = [
+    "Python %s (%s) on %s %s, machine %s" % (runtime.get("pythonVersion"), runtime.get("implementation"),
+                                            runtime.get("systemName"), runtime.get("systemVersion"), runtime.get("machine")),
+    "Initialized: %s, start-up %.0f ms" % (report.get("initialized"), runtime.get("startupMs") or 0),
+    "Missing-runtime diagnostic detected: %s" % (report.get("missingRuntimeDiagnostic") or {}).get("detected"),
+]
 for case in selftest.get("cases", []):
-    print("  %s  %s" % ("PASS" if case["passed"] else "FAIL", case["title"]))
+    detail = "" if case["passed"] else " (status %s, error %s, stdout %r)" % (case.get("status"), case.get("errorType"), str(case.get("stdout"))[:200])
+    lines.append("%s  %s%s" % ("PASS" if case["passed"] else "FAIL", case["title"], detail))
 unavailable = [m["module"] for m in selftest.get("modules", []) if not m["available"]]
-print("Modules importable: %s/%s; unavailable: %s" % (summary.get("modulesAvailable"), summary.get("modulesChecked"), ", ".join(unavailable)))
+lines.append("Modules importable: %s/%s; unavailable: %s" % (summary.get("modulesAvailable"), summary.get("modulesChecked"), ", ".join(unavailable)))
+print("\n".join(lines))
 if not report.get("success"):
-    print("::error::Embedded Python self-test failed")
     if report.get("initError"):
-        print(json.dumps(report["initError"], indent=2))
+        lines.append("Start-up error: " + json.dumps(report["initError"]))
+    annotate("error", "Simulator self-test failed", "\n".join(lines))
     sys.exit(1)
+annotate("notice", "Simulator self-test passed", "\n".join(lines))
 print("Embedded Python self-test passed")
 PY

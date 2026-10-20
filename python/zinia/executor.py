@@ -61,9 +61,24 @@ def _is_real_path(filename: str) -> bool:
     return bool(filename) and not filename.startswith("<") and os.path.isabs(filename)
 
 
+def _root_prefixes(roots) -> tuple[str, ...]:
+    """Both the given and the symlink-resolved form of each root.
+
+    On Apple platforms the same folder is reachable as /var/... and
+    /private/var/...; a module may have been imported through either form.
+    """
+    prefixes = set()
+    for root in roots:
+        if not root:
+            continue
+        for form in (os.path.abspath(root), os.path.realpath(root)):
+            prefixes.add(os.path.normcase(form).rstrip("\\/") + os.sep)
+    return tuple(prefixes)
+
+
 def purge_user_modules(roots) -> list[str]:
     """Remove modules imported from any of ``roots`` from ``sys.modules``."""
-    prefixes = tuple(_norm(r).rstrip("\\/") + os.sep for r in roots if r)
+    prefixes = _root_prefixes(roots)
     if not prefixes:
         return []
     removed = []

@@ -115,7 +115,8 @@ class ExecutionModelTests(RuntimeTestCase):
         r = self.run_code("import os, sys\nprint(os.getcwd())\nprint(sys.argv[0])\nsys.path.append('/x')\n"
                           "os.chdir('..')\n")
         lines = r["stdout"].splitlines()
-        self.assertEqual(os.path.normcase(lines[0]), os.path.normcase(self.tmp))
+        # os.getcwd() reports the resolved path (/private/var/... on macOS and iOS).
+        self.assertEqual(os.path.normcase(os.path.realpath(lines[0])), os.path.normcase(os.path.realpath(self.tmp)))
         self.assertTrue(lines[1].endswith("main.py"))
         self.assertEqual(os.getcwd(), before_cwd)
         self.assertEqual(sys.path, before_path)
@@ -229,3 +230,22 @@ class PurgeTests(RuntimeTestCase):
         removed = executor.purge_user_modules([self.tmp])
         self.assertIn("mymod", removed)
         self.assertIn("json", sys.modules)
+
+    def test_purge_matches_symlinked_and_resolved_paths(self):
+        # Like /var -> /private/var on Apple platforms: the root is given in one
+        # form and the module was imported through the other.
+        real = os.path.join(self.tmp, "real")
+        alias = os.path.join(self.tmp, "alias")
+        os.makedirs(real)
+        try:
+            os.symlink(real, alias, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("creating symlinks is not permitted here")
+        with open(os.path.join(real, "aliasmod.py"), "w", encoding="utf-8") as fh:
+            fh.write("X = 1\n")
+        sys.path.insert(0, real)
+        try:
+            import aliasmod  # noqa: F401
+        finally:
+            sys.path.remove(real)
+        self.assertIn("aliasmod", executor.purge_user_modules([alias]))

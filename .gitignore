@@ -8,6 +8,9 @@ coverage/
 .dev-workspace/
 .dev-runtime/
 
+# CI build output and logs
+/build/
+
 # Python
 __pycache__/
 *.pyc
