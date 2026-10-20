@@ -38,7 +38,7 @@ enum ZiniaSelfTestRunner {
             case .failure(let diagnostic):
                 report["initialized"] = false
                 report["initError"] = ["code": diagnostic.code, "message": diagnostic.message, "data": diagnostic.data]
-                finish(report, success: false)
+                ZiniaSelfTestRunner.finish(report, success: false)
             case .success(let info):
                 report["initialized"] = true
                 report["runtime"] = info
@@ -49,7 +49,7 @@ enum ZiniaSelfTestRunner {
                     let summary = result?["summary"] as? [String: Any]
                     let ok = (summary?["ok"] as? Bool ?? false)
                         && ((report["missingRuntimeDiagnostic"] as? [String: Any])?["detected"] as? Bool ?? false)
-                    finish(report, success: ok)
+                    ZiniaSelfTestRunner.finish(report, success: ok)
                 }
             }
         }

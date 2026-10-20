@@ -76,6 +76,21 @@ def _root_prefixes(roots) -> tuple[str, ...]:
     return tuple(prefixes)
 
 
+_resolved_cache: dict[str, str] = {}
+
+
+def _resolved(path: str) -> str:
+    """Symlink-resolved, normalised path; cached because it is asked for every
+    imported module on every run and module locations rarely change."""
+    cached = _resolved_cache.get(path)
+    if cached is None:
+        cached = os.path.normcase(os.path.realpath(path))
+        if len(_resolved_cache) > 20_000:
+            _resolved_cache.clear()
+        _resolved_cache[path] = cached
+    return cached
+
+
 def purge_user_modules(roots) -> list[str]:
     """Remove modules imported from any of ``roots`` from ``sys.modules``."""
     prefixes = _root_prefixes(roots)
@@ -98,7 +113,7 @@ def purge_user_modules(roots) -> list[str]:
             except TypeError:
                 pass
         for loc in locations:
-            if _norm(loc).startswith(prefixes):
+            if _norm(loc).startswith(prefixes) or _resolved(loc).startswith(prefixes):
                 sys.modules.pop(name, None)
                 removed.append(name)
                 break
