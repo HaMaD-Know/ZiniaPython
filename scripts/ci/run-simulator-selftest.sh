@@ -32,11 +32,17 @@ done
 kill "$PID" 2>/dev/null || true
 xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
 
-python3 - "$LOG" "$OUT" <<'PY'
+# The runner also writes the full report to Documents/zinia-selftest.json; the
+# console copy can be cut off because the pseudo-terminal limits line length.
+DATA=$(xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" data 2>/dev/null || true)
+REPORT_FILE="${DATA:+$DATA/Documents/zinia-selftest.json}"
+
+python3 - "$LOG" "$OUT" "${REPORT_FILE:-}" <<'PY'
 import json
+import os
 import sys
 
-log, out = sys.argv[1], sys.argv[2]
+log, out, report_file = sys.argv[1], sys.argv[2], sys.argv[3]
 text = open(log, encoding="utf-8", errors="replace").read()
 
 
@@ -71,7 +77,11 @@ lines.append("Modules importable: %s/%s; unavailable: %s" % (summary.get("module
 print("\n".join(lines))
 if not report.get("success"):
     if report.get("initError"):
-        lines.append("Start-up error: " + json.dumps(report["initError"]))
+        err = report["initError"]
+        lines.append("Start-up error %s: %s" % (err.get("code"), err.get("message")))
+        tb = (err.get("data") or {}).get("pythonTraceback")
+        if tb:
+            lines.append(tb)
     annotate("error", "Simulator self-test failed", "\n".join(lines))
     sys.exit(1)
 annotate("notice", "Simulator self-test passed", "\n".join(lines))

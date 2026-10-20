@@ -17,7 +17,7 @@ def _stdlib_dirs() -> tuple[str, ...]:
     for key in ("stdlib", "platstdlib", "purelib", "platlib"):
         try:
             path = sysconfig.get_path(key)
-        except (KeyError, ValueError):  # pragma: no cover - unusual sysconfig layouts
+        except Exception:  # noqa: BLE001 - sysconfig raises on some embedded layouts (seen on iOS)
             path = None
         if path:
             dirs.add(os.path.normcase(os.path.abspath(path)) + os.sep)
