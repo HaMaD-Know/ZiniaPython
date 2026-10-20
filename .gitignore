@@ -1,0 +1,52 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Desktop development bridge data (npm run dev:bridge)
+.dev-workspace/
+.dev-runtime/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Downloaded CPython runtime (fetched by scripts/fetch-python-runtime.*; pinned in python-runtime/runtime.lock.json)
+ios/App/Python.xcframework/
+python-runtime/downloads/
+
+# Capacitor-generated iOS content
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/App/config.xml
+ios/App/Pods/
+ios/App/output/
+ios/DerivedData/
+ios/App/build/
+xcuserdata/
+*.xcuserstate
+ios/App/App.xcworkspace/xcuserdata/
+
+# Release packaging
+release/
+*.ipa
+*.xcarchive
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Signing material must never be committed
+*.p12
+*.mobileprovision
+*.cer
+*.p8
+signing/
+
+# Local Claude Code settings
+.claude/settings.local.json

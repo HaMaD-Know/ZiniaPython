@@ -1,0 +1,80 @@
+# Fast checks on every push and pull request (Linux, no Xcode needed):
+# lint, types, frontend tests, web build, iOS project integrity, the Python
+# runtime test-suite on real CPython, and verification of the pinned CPython
+# iOS distribution (download, checksum, Mach-O architectures).
+name: Validate
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Frontend and project checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Check iOS project wiring
+        run: npm run check:ios
+
+  python:
+    name: Runtime engine on CPython ${{ matrix.python }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.14 is the version embedded in the app; 3.12 is the oldest supported.
+        python: ['3.12', '3.14']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run python/tests
+        run: python -I python/tests/run_tests.py
+
+  runtime:
+    name: Verify pinned CPython iOS framework
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: actions/cache@v6
+        with:
+          path: python-runtime/downloads
+          key: python-runtime-${{ hashFiles('python-runtime/runtime.lock.json') }}
+      - name: Download and check SHA-256
+        run: bash scripts/fetch-python-runtime.sh
+      - name: Verify slices, architectures and standard library
+        run: node scripts/verify-runtime.mjs

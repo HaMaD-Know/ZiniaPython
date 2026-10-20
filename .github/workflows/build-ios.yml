@@ -1,0 +1,220 @@
+# Builds ZiniaPython for iOS on macOS with the embedded CPython runtime.
+#
+#  1. checks and tests (frontend, runtime engine, project wiring)
+#  2. web build + `cap sync ios`
+#  3. fetch the pinned CPython iOS framework (checksum verified)
+#  4. Simulator build, then launch it with --zinia-selftest: real CPython starts
+#     inside the app and runs the self-test scripts (fails the job if broken)
+#  5. unsigned device build (arm64) -> ZiniaPython-unsigned.ipa artifact
+#  6. optional signed archive + export when signing secrets are configured
+#
+# An unsigned IPA is NOT installable as it is; see docs/SIGNING.md.
+name: Build iOS
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      run_selftest:
+        description: Run the embedded-Python self-test on the iOS Simulator
+        type: boolean
+        default: true
+      export_method:
+        description: Export method for the signed IPA (used only when signing secrets exist)
+        type: choice
+        default: release-testing
+        options: [debugging, release-testing, app-store-connect, enterprise]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  XCODE_VERSION: '26.5'
+  PROJECT: ios/App/App.xcodeproj
+  SCHEME: App
+
+jobs:
+  build:
+    name: Build, self-test and package
+    runs-on: macos-26
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: bash scripts/ci/select-xcode.sh
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint, type check and frontend tests
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+
+      - name: Runtime engine tests (desktop CPython 3.14)
+        run: python -I python/tests/run_tests.py
+
+      - name: Build web assets and sync the iOS project
+        run: |
+          npm run build
+          npx cap sync ios
+
+      - name: Check iOS project wiring
+        run: npm run check:ios
+
+      - uses: actions/cache@v6
+        with:
+          path: python-runtime/downloads
+          key: python-runtime-${{ hashFiles('python-runtime/runtime.lock.json') }}
+
+      - name: Fetch pinned CPython iOS framework
+        run: bash scripts/fetch-python-runtime.sh
+
+      - name: Verify framework architectures
+        run: |
+          node scripts/verify-runtime.mjs
+          lipo -info ios/App/Python.xcframework/ios-arm64/Python.framework/Python
+          lipo -info ios/App/Python.xcframework/ios-arm64_x86_64-simulator/Python.framework/Python
+
+      - name: Resolve Swift packages
+        run: bash scripts/ci/xcodebuild-logged.sh resolve-packages -resolvePackageDependencies -project "$PROJECT" -scheme "$SCHEME"
+
+      # ------------------------------------------------------------ simulator
+      - name: Build for the iOS Simulator
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_selftest }}
+        run: |
+          UDID=$(bash scripts/ci/pick-simulator.sh)
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          bash scripts/ci/xcodebuild-logged.sh simulator-build build \
+            -project "$PROJECT" -scheme "$SCHEME" -configuration Debug \
+            -destination "id=$UDID" -derivedDataPath build/sim \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=YES
+
+      - name: Verify simulator app bundle
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_selftest }}
+        run: bash scripts/ci/verify-app-bundle.sh build/sim/Build/Products/Debug-iphonesimulator/App.app simulator
+
+      - name: Embedded Python self-test on the Simulator
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_selftest }}
+        run: bash scripts/ci/run-simulator-selftest.sh "$SIM_UDID" build/sim/Build/Products/Debug-iphonesimulator/App.app build/selftest/simulator-selftest.json
+
+      # --------------------------------------------------------------- device
+      - name: Build for iOS devices (unsigned)
+        run: |
+          bash scripts/ci/xcodebuild-logged.sh device-build build \
+            -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/device \
+            ARCHS=arm64 CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      - name: Verify device app bundle
+        run: bash scripts/ci/verify-app-bundle.sh build/device/Build/Products/Release-iphoneos/App.app device
+
+      - name: Package unsigned IPA
+        run: bash scripts/ci/package-ipa.sh build/device/Build/Products/Release-iphoneos/App.app build/artifacts/ZiniaPython-unsigned.ipa
+
+      # --------------------------------------------------------------- signed
+      - name: Check for signing secrets
+        id: signing
+        env:
+          P12: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          if [ -n "$P12" ] && [ -n "$PROFILE" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No signing secrets configured; only the unsigned IPA is produced. See docs/SIGNING.md."
+          fi
+
+      - name: Import signing certificate and profile
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+        run: bash scripts/ci/import-signing.sh
+
+      - name: Archive and export signed IPA
+        if: steps.signing.outputs.enabled == 'true'
+        env:
+          EXPORT_METHOD: ${{ inputs.export_method || 'release-testing' }}
+        run: |
+          # Manual signing is set on the App target only; Swift package targets keep their defaults.
+          node scripts/ci/configure-signing.mjs
+          bash scripts/ci/xcodebuild-logged.sh archive archive \
+            -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/ZiniaPython.xcarchive \
+            -derivedDataPath build/archive ARCHS=arm64
+          cat > build/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>${EXPORT_METHOD}</string>
+            <key>teamID</key><string>${SIGN_TEAM_ID}</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>signingCertificate</key><string>${SIGN_IDENTITY}</string>
+            <key>provisioningProfiles</key><dict><key>${SIGN_BUNDLE_ID}</key><string>${SIGN_PROFILE_NAME}</string></dict>
+            <key>stripSwiftSymbols</key><true/>
+          </dict></plist>
+          EOF
+          bash scripts/ci/xcodebuild-logged.sh export -exportArchive -archivePath build/ZiniaPython.xcarchive \
+            -exportOptionsPlist build/ExportOptions.plist -exportPath build/signed
+          mv build/signed/*.ipa build/artifacts/ZiniaPython-signed.ipa
+          codesign -dv --verbose=2 build/ZiniaPython.xcarchive/Products/Applications/App.app 2>&1 | grep -E 'Authority|TeamIdentifier' || true
+
+      - name: Remove temporary keychain
+        if: always() && steps.signing.outputs.enabled == 'true'
+        run: security delete-keychain "$SIGN_KEYCHAIN" || true
+
+      # ------------------------------------------------------------ artifacts
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v7
+        with:
+          name: ZiniaPython-unsigned-ipa
+          path: build/artifacts/ZiniaPython-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload signed IPA
+        if: steps.signing.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ZiniaPython-signed-ipa
+          path: build/artifacts/ZiniaPython-signed.ipa
+          retention-days: 30
+
+      - name: Upload simulator app
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_selftest }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ZiniaPython-simulator-app
+          path: build/sim/Build/Products/Debug-iphonesimulator/App.app
+          retention-days: 14
+
+      - name: Upload self-test report and build logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ZiniaPython-build-logs
+          path: |
+            build/logs/
+            build/selftest/
+          retention-days: 30

@@ -1,0 +1,18 @@
+{
+  "description": "Pinned CPython distribution for iOS. Downloaded by scripts/fetch-python-runtime.sh (macOS/CI) or .ps1 (Windows, inspection only).",
+  "provider": "BeeWare Python-Apple-support",
+  "release": "3.14-b12",
+  "pythonVersion": "3.14.8",
+  "pythonMinor": "3.14",
+  "url": "https://github.com/beeware/Python-Apple-support/releases/download/3.14-b12/Python-3.14-iOS-support.b12.tar.gz",
+  "sha256": "157a6b956f47a12f005ad1e23e3e264536ef06dd35e1366acb48edbaa128e0a3",
+  "sizeBytes": 37085073,
+  "minimumIOS": "13.0",
+  "slices": {
+    "ios-arm64": ["arm64"],
+    "ios-arm64_x86_64-simulator": ["arm64", "x86_64"]
+  },
+  "buildHelper": "Python.xcframework/build/utils.sh",
+  "license": "Python Software Foundation License 2; Python-Apple-support is BSD-3-Clause; bundled libraries listed in LICENSES.md",
+  "verifiedOn": "2026-10-20"
+}

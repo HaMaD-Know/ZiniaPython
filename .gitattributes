@@ -1,0 +1,22 @@
+# Normalise text files; keep files used on macOS/Linux with LF endings even
+# when the repository is checked out on Windows.
+* text=auto
+
+*.sh text eol=lf
+*.py text eol=lf
+*.mjs text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.swift text eol=lf
+*.m text eol=lf
+*.h text eol=lf
+*.plist text eol=lf
+*.storyboard text eol=lf
+*.pbxproj text eol=lf -diff
+*.xcconfig text eol=lf
+*.ps1 text eol=crlf
+
+*.png binary
+*.whl binary
+*.tar.gz binary

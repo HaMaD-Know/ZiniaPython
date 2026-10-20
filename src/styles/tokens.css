@@ -1,0 +1,151 @@
+/*
+ * Design tokens. Deep ink-navy surfaces; blue marks focus and actions,
+ * violet is reserved for "Python is running". Status colours carry meaning
+ * only (finished, warning, error) and are never decorative.
+ */
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  --font-code: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, 'Cascadia Code', Consolas, monospace;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 22px;
+
+  --radius-sm: 7px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --topbar-h: 52px;
+  --tabbar-h: 38px;
+  --console-header-h: 44px;
+  --bottomnav-h: 54px;
+  --keybar-h: 46px;
+  --rail-w: 52px;
+  --sidebar-w: 272px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  --editor-font-size: 14px;
+  --console-font-size: 13px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0e1220;
+  --surface: #131a2b;
+  --surface-2: #1a2237;
+  --surface-raised: #1e2740;
+  --line: #242e47;
+  --line-strong: #34405f;
+  --text: #e4e8f4;
+  --muted: #8b95b1;
+  --faint: #5c6683;
+  --accent: #6d9bff;
+  --accent-strong: #93b4ff;
+  --accent-soft: rgba(109, 155, 255, 0.35);
+  --accent-wash: rgba(109, 155, 255, 0.12);
+  --on-accent: #0a1022;
+  --violet: #a68bff;
+  --violet-wash: rgba(166, 139, 255, 0.14);
+  --ok: #5fd3a3;
+  --warn: #f1c46c;
+  --danger: #ff6b81;
+  --danger-soft: rgba(255, 107, 129, 0.22);
+  --danger-line: rgba(255, 107, 129, 0.13);
+  --shadow-pop: 0 18px 50px rgba(3, 6, 18, 0.55), 0 2px 8px rgba(3, 6, 18, 0.4);
+  --backdrop: rgba(5, 8, 18, 0.55);
+
+  --editor-bg: #0f1527;
+  --code-text: #dde3f3;
+  --gutter-text: #4d5876;
+  --selection: rgba(109, 155, 255, 0.28);
+  --selection-match: rgba(109, 155, 255, 0.14);
+  --active-line: rgba(255, 255, 255, 0.028);
+  --bracket-match: rgba(109, 155, 255, 0.2);
+  --search-match: rgba(241, 196, 108, 0.2);
+  --search-match-border: rgba(241, 196, 108, 0.5);
+  --search-match-active: rgba(241, 196, 108, 0.42);
+
+  --syn-keyword: #b49cff;
+  --syn-string: #8fd6a6;
+  --syn-number: #ffb48a;
+  --syn-comment: #67718f;
+  --syn-function: #7db5ff;
+  --syn-class: #f2cd7a;
+  --syn-builtin: #6fd2df;
+  --syn-constant: #ff92ab;
+  --syn-decorator: #e3a3ff;
+  --syn-property: #c4cde6;
+  --syn-punct: #98a2be;
+  --syn-escape: #ffd37a;
+
+  --console-bg: #0c1120;
+  --out-stdout: #dce2f2;
+  --out-stderr: #ff9aaa;
+  --out-system: #8b95b1;
+  --out-stdin: #93b4ff;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f2f3f8;
+  --surface: #ffffff;
+  --surface-2: #edf0f7;
+  --surface-raised: #ffffff;
+  --line: #dfe3ee;
+  --line-strong: #c8cfdf;
+  --text: #18203a;
+  --muted: #59637e;
+  --faint: #8d96ad;
+  --accent: #3a66e0;
+  --accent-strong: #2b52c4;
+  --accent-soft: rgba(58, 102, 224, 0.35);
+  --accent-wash: rgba(58, 102, 224, 0.09);
+  --on-accent: #ffffff;
+  --violet: #7450e6;
+  --violet-wash: rgba(116, 80, 230, 0.1);
+  --ok: #17905f;
+  --warn: #a8720f;
+  --danger: #d2334f;
+  --danger-soft: rgba(210, 51, 79, 0.16);
+  --danger-line: rgba(210, 51, 79, 0.09);
+  --shadow-pop: 0 18px 50px rgba(20, 30, 60, 0.18), 0 2px 8px rgba(20, 30, 60, 0.1);
+  --backdrop: rgba(20, 26, 45, 0.32);
+
+  --editor-bg: #fbfcff;
+  --code-text: #1f2742;
+  --gutter-text: #a2aac0;
+  --selection: rgba(58, 102, 224, 0.2);
+  --selection-match: rgba(58, 102, 224, 0.1);
+  --active-line: rgba(30, 50, 110, 0.035);
+  --bracket-match: rgba(58, 102, 224, 0.16);
+  --search-match: rgba(234, 170, 40, 0.24);
+  --search-match-border: rgba(190, 130, 20, 0.5);
+  --search-match-active: rgba(234, 170, 40, 0.45);
+
+  --syn-keyword: #7a3fdc;
+  --syn-string: #1e8754;
+  --syn-number: #bf5418;
+  --syn-comment: #8a93a8;
+  --syn-function: #2456d4;
+  --syn-class: #9c620a;
+  --syn-builtin: #0d8291;
+  --syn-constant: #c21a59;
+  --syn-decorator: #9a28ae;
+  --syn-property: #33415e;
+  --syn-punct: #5a6481;
+  --syn-escape: #a56a00;
+
+  --console-bg: #f7f8fc;
+  --out-stdout: #1c2440;
+  --out-stderr: #c42744;
+  --out-system: #6a7390;
+  --out-stdin: #2b52c4;
+}

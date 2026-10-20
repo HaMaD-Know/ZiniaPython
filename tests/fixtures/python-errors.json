@@ -1,0 +1,73 @@
+{
+  "python": "3.12.10",
+  "syntax": {
+    "type": "SyntaxError",
+    "message": "invalid syntax",
+    "category": "syntax",
+    "traceback": "  File \"/workspace/MyProject/main.py\", line 1\n    def broken(:\n               ^\nSyntaxError: invalid syntax\n",
+    "frames": [],
+    "syntax": {
+      "filename": "/workspace/MyProject/main.py",
+      "lineno": 1,
+      "offset": 12,
+      "endLineno": 1,
+      "endOffset": 13,
+      "text": "def broken(:"
+    },
+    "location": {
+      "filename": "/workspace/MyProject/main.py",
+      "lineno": 1,
+      "colno": 12
+    }
+  },
+  "runtime": {
+    "type": "ZeroDivisionError",
+    "message": "division by zero",
+    "category": "runtime",
+    "traceback": "Traceback (most recent call last):\n  File \"/workspace/MyProject/main.py\", line 1, in <module>\n    print(1 / 0)\n          ~~^~~\nZeroDivisionError: division by zero\n",
+    "frames": [
+      {
+        "filename": "/workspace/MyProject/main.py",
+        "lineno": 1,
+        "endLineno": 1,
+        "colno": 6,
+        "name": "<module>",
+        "line": "print(1 / 0)",
+        "isLibrary": false
+      }
+    ],
+    "location": {
+      "filename": "/workspace/MyProject/main.py",
+      "lineno": 1,
+      "colno": 6
+    }
+  },
+  "missingModule": {
+    "type": "ModuleNotFoundError",
+    "message": "No module named 'zinia_missing_fixture'",
+    "category": "import",
+    "traceback": "Traceback (most recent call last):\n  File \"/workspace/MyProject/main.py\", line 1, in <module>\n    import zinia_missing_fixture\nModuleNotFoundError: No module named 'zinia_missing_fixture'\n",
+    "frames": [
+      {
+        "filename": "/workspace/MyProject/main.py",
+        "lineno": 1,
+        "endLineno": 1,
+        "colno": 0,
+        "name": "<module>",
+        "line": "import zinia_missing_fixture",
+        "isLibrary": false
+      }
+    ],
+    "location": {
+      "filename": "/workspace/MyProject/main.py",
+      "lineno": 1,
+      "colno": 0
+    },
+    "missingModule": "zinia_missing_fixture",
+    "moduleHelp": {
+      "category": "unknown",
+      "explanation": "No module named 'zinia_missing_fixture' was found in the bundled standard library, your project folder, or installed packages. If it is your own module, check that the file is in the project folder. If it is a pure-Python package from PyPI, install it from the Packages screen.",
+      "module": "zinia_missing_fixture"
+    }
+  }
+}
