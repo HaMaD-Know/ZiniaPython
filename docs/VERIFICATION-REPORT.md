@@ -81,7 +81,7 @@ Problems found and fixed on the way to this run (runs 1–6): a desktop test tha
 | --- | --- | --- |
 | `python/tests/test_graphics.py` (17 tests): ordered command batches for the spec's 2D and 3D examples, outline/fill, colours, errors pointing at the user's line, animation with simulated touches and keys, `stop_animation`, fps validation, fresh state per run, drawing sent after an error, coalesced 3D changes, remove, validation, tap → object, REPL drawing, **all 12 examples run** | passed | desktop CPython 3.12 |
 | `tests/unit/graphics.test.ts` (17 tests): 2D renderer draw order and replay, `set_background`/`clear` retention, canvas fitting and backing-store limit, pointer mapping, stale-run filtering, REPL batches, once-per-frame event posting with move coalescing, nothing posted after a run, malformed payloads, 3D scene model add/set/remove/dispose, default lights, camera home, bad commands | passed | Vitest (jsdom, no WebGL) |
-| Self-test case "Graphics modules zinia_draw and zinia_3d" | passes on desktop CPython | **iOS: runs in the next CI simulator self-test** |
+| Self-test case "Graphics modules zinia_draw and zinia_3d" | **passed: 16/16 self-test checks** | iOS Simulator (iOS 26.5, arm64), CPython 3.14.8 inside the app, Build iOS run #8 |
 | Browser walkthrough, desktop bridge (below) | passed | Chromium-based browser pane, desktop CPython |
 | On an iPhone or iPad | **not run** | no device available |
 

@@ -11,7 +11,7 @@ A Python IDE for iPhone and iPad. You write Python in a CodeMirror 6 editor, and
 | Graphics | `zinia_draw` (2D canvas) and `zinia_3d` (3D scenes with bundled Three.js), drawn in a Graphics preview panel with touch input and animation |
 | Builds | GitHub Actions on macOS: simulator build plus an **embedded-Python self-test**, an unsigned device IPA, and an optional signed IPA |
 
-> **Status:** GitHub Actions builds the app and runs CPython 3.14.8 inside it on the iOS Simulator: all 15 self-test checks pass. It has not yet been installed on a physical device. See [docs/VERIFICATION-REPORT.md](docs/VERIFICATION-REPORT.md) for exactly what ran and what did not.
+> **Status:** GitHub Actions builds the app and runs CPython 3.14.8 inside it on the iOS Simulator: all 16 self-test checks pass, including the graphics modules. It has not yet been installed on a physical device. See [docs/VERIFICATION-REPORT.md](docs/VERIFICATION-REPORT.md) for exactly what ran and what did not.
 
 ---
 
