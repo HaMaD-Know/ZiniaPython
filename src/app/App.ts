@@ -12,6 +12,9 @@ import { FileExplorer } from '../files/FileExplorer';
 import { basename, copyName, dirname, isInside, isPythonFile, isProbablyText, join, normalize, validateName } from '../files/paths';
 import type { Entry } from '../files/providers';
 import { Workspace } from '../files/workspace';
+import { GRAPHICS_EXAMPLES, GRAPHICS_EXAMPLES_ENTRY, GRAPHICS_EXAMPLES_PROJECT } from '../graphics/examples';
+import { GraphicsController } from '../graphics/GraphicsController';
+import { GraphicsPanel } from '../graphics/GraphicsPanel';
 import { PackagesView } from '../packages/PackagesView';
 import { DEV_BRIDGE } from '../plugins/dev-bridge-flag';
 import { ZiniaFiles } from '../plugins/zinia-files';
@@ -57,6 +60,9 @@ export class ZiniaApp {
   private explorer!: FileExplorer;
   private packagesView!: PackagesView;
   private settingsView!: SettingsView;
+  private graphics!: GraphicsPanel;
+  private graphicsController!: GraphicsController;
+  private graphicsButton!: HTMLButtonElement;
 
   // DOM
   private shell!: HTMLElement;
@@ -156,6 +162,17 @@ export class ZiniaApp {
     this.consolePanel.setAutoScroll(s.autoScroll);
     this.python.onBackgroundOutput = (stream, text) => this.consolePanel.appendBackground(stream, text);
 
+    this.graphics = new GraphicsPanel({
+      run: () => void this.runActive(),
+      stop: () => void this.stop(),
+      openExamples: () => void this.openGraphicsExamples(),
+      changed: () => this.onGraphicsPanelChanged(),
+    });
+    this.graphicsController = new GraphicsController(this.graphics, (executionId, events) =>
+      this.python.postGraphicsEvents(executionId, events));
+    this.graphics.connect(this.graphicsController);
+    this.python.onGraphics = (payload) => this.graphicsController.handlePayload(payload);
+
     this.explorer = new FileExplorer(this.workspace, {
       openFile: (ref, line) => void this.openFile(ref, line),
       runFile: (ref) => void this.openFile(ref).then(() => this.runActive()),
@@ -192,6 +209,12 @@ export class ZiniaApp {
     this.stopButton = h('button', { class: 'stop-btn', title: 'Stop the running script', disabled: true, attrs: { 'aria-label': 'Stop' }, onClick: () => void this.stop() }, icon('stop', 15), h('span', null, 'Stop'));
     this.statusText = h('span', { class: 'status-text' });
     this.statusRail = h('div', { class: 'status-rail', attrs: { 'aria-hidden': 'true' } });
+    this.graphicsButton = h('button', {
+      class: 'icon-btn',
+      title: 'Graphics preview',
+      attrs: { 'aria-label': 'Graphics preview', 'aria-pressed': 'false' },
+      onClick: () => this.graphics.toggle(),
+    }, icon('shapes', 20));
 
     const topBar = h(
       'header',
@@ -203,6 +226,7 @@ export class ZiniaApp {
       ),
       h('div', { class: 'top-actions' },
         h('button', { class: 'icon-btn', title: 'More actions', attrs: { 'aria-label': 'More actions' }, onClick: (e: Event) => this.showMainMenu(e.currentTarget as HTMLElement) }, icon('more', 20)),
+        this.graphicsButton,
         this.stopButton,
         this.runButton,
       ),
@@ -251,7 +275,10 @@ export class ZiniaApp {
       topBar,
       this.statusRail,
       this.tabBar,
-      h('div', { class: 'editor-area' }, this.banner, this.editorHost, this.emptyEditor),
+      h('div', { class: 'editor-area' },
+        h('div', { class: 'editor-column' }, this.banner, this.editorHost, this.emptyEditor),
+        this.graphics.el,
+      ),
       this.consoleHost,
       this.pageHost,
     );
@@ -471,6 +498,7 @@ export class ZiniaApp {
     const running = snapshot.state === 'running' || snapshot.state === 'interrupt-requested';
     this.runButton.disabled = running || snapshot.fatal || snapshot.state === 'initializing' || snapshot.state === 'not-initialized';
     this.stopButton.disabled = !this.python.canInterrupt;
+    this.graphics?.setRunning(running, !this.runButton.disabled);
     this.shell.classList.toggle('is-running', running);
     if (this.elapsedTimer) {
       clearInterval(this.elapsedTimer);
@@ -574,6 +602,7 @@ export class ZiniaApp {
     const executionId = newExecutionId('run');
     const block = this.consolePanel.beginRun(executionId, this.workspace.displayName(tab.ref));
     this.activeRun = { executionId, block };
+    this.graphicsController.beginRun(executionId);
     let result: PythonExecutionResult;
     try {
       result = await this.python.runScript(
@@ -594,10 +623,12 @@ export class ZiniaApp {
       this.lastOutcome = { tone: 'error', text: 'Run failed' };
       if (err.code === 'NOT_READY' || err.code === 'UNAVAILABLE') this.showRuntimeDiagnostic();
       this.activeRun = null;
+      this.graphicsController.endRun(executionId);
       this.onRuntimeState(this.python.machine.current);
       return;
     }
     this.activeRun = null;
+    this.graphicsController.endRun(executionId);
     block.finish(result);
     const outcome =
       result.status === 'ok'
@@ -633,6 +664,8 @@ export class ZiniaApp {
     const active = this.tabs.active;
     const project = active && !active.untitled ? projectOf(active.ref) : null;
     const projectAbs = project ? this.projects.absoluteFolder(project) ?? undefined : undefined;
+    const executionId = newExecutionId('repl');
+    this.graphicsController.beginRepl(executionId);
     try {
       return await this.python.runRepl(source, mode, projectAbs ?? this.workspace.allRoots[0]?.absolute ?? undefined, projectAbs, {
         onOutput: (stream, text) => this.consolePanel.replOutput(stream, text),
@@ -640,11 +673,12 @@ export class ZiniaApp {
           toast('input() is not supported in the REPL; it receives end-of-file', 'info', 4000);
           void this.python.provideInput(this.python.machine.current.executionId ?? '', null);
         },
-      });
+      }, executionId);
     } catch (error) {
       toast(toRuntimeError(error).message, 'error', 4000);
       return null;
     } finally {
+      this.graphicsController.endRun(executionId);
       this.onRuntimeState(this.python.machine.current);
     }
   }
@@ -1172,6 +1206,38 @@ export class ZiniaApp {
     }
   }
 
+  // ---------------------------------------------------------------------
+  // Graphics preview
+  // ---------------------------------------------------------------------
+
+  private onGraphicsPanelChanged(): void {
+    const open = this.graphics.opened;
+    this.graphicsButton.classList.toggle('toggled', open);
+    this.graphicsButton.setAttribute('aria-pressed', String(open));
+    this.shell.classList.toggle('graphics-open', open);
+    this.shell.classList.toggle('graphics-fullscreen', this.graphics.fullscreen);
+  }
+
+  /** Copy the bundled graphics examples into the workspace and open the first one. */
+  private async openGraphicsExamples(): Promise<void> {
+    try {
+      const { project, added } = await this.projects.installBundled(GRAPHICS_EXAMPLES_PROJECT, GRAPHICS_EXAMPLES, GRAPHICS_EXAMPLES_ENTRY);
+      await this.explorer.refresh();
+      await this.openFile({ root: project.root, path: join(project.path, GRAPHICS_EXAMPLES_ENTRY) });
+      this.openDrawer();
+      const count = Object.keys(GRAPHICS_EXAMPLES).filter((name) => name.endsWith('.py')).length;
+      toast(
+        added > 0
+          ? `${count} graphics examples are in "${GRAPHICS_EXAMPLES_PROJECT}". Open one and press Run.`
+          : `The examples are in "${GRAPHICS_EXAMPLES_PROJECT}" (your edits were kept).`,
+        'success',
+        4000,
+      );
+    } catch (error) {
+      toast((error as Error).message, 'error', 4000);
+    }
+  }
+
   private async renameEntry(rootId: string, entry: Entry): Promise<void> {
     const name = await promptDialog(`Rename ${entry.name}`, { value: entry.name, confirmLabel: 'Rename', validate: validateName, select: 'stem' });
     if (!name || name === entry.name) return;
@@ -1407,6 +1473,8 @@ export class ZiniaApp {
       'separator',
       { label: 'Open REPL', icon: 'terminal', action: () => { this.ensureConsoleVisible(); this.consolePanel.focusRepl(); } },
       { label: 'New scratch file', icon: 'newFile', action: () => this.newScratch() },
+      { label: this.graphics.opened ? 'Hide graphics preview' : 'Show graphics preview', icon: 'shapes', action: () => this.graphics.toggle() },
+      { label: 'Graphics examples', icon: 'cube', action: () => void this.openGraphicsExamples() },
       { label: 'Close file', icon: 'close', disabled: !tab, action: () => void (tab && this.closeTab(tab.id)) },
     ]);
   }

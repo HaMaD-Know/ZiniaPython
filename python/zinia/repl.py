@@ -26,7 +26,7 @@ import sys
 import time
 import types
 
-from . import errors, executor, streams
+from . import errors, executor, graphics, streams
 
 _FUTURE_MASK = 0
 for _name in __future__.all_feature_names:
@@ -113,6 +113,8 @@ class ReplSession:
                 except BaseException as exc:  # noqa: BLE001
                     status = "error"
                     error = errors.describe(exc, user_files=(filename,))
+                finally:
+                    graphics.end_run()  # show what the statement drew (the scene itself is kept)
                 # Keep the source registered so later tracebacks that pass
                 # through functions defined here can still show their lines.
 

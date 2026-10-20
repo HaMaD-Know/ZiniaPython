@@ -29,6 +29,8 @@ export interface ZiniaPythonPlugin {
   executeFile(options: ExecuteFileOptions): Promise<PythonExecutionResult>;
   interrupt(options: { executionId: string }): Promise<InterruptResult>;
   provideInput(options: { executionId: string; text?: string; eof?: boolean }): Promise<{ accepted: boolean }>;
+  /** Touch, key and frame-acknowledgement events for a running zinia_draw / zinia_3d program. */
+  postGraphicsEvents(options: { executionId: string; events: string }): Promise<{ accepted: boolean }>;
   replExecute(options: ReplOptions): Promise<PythonExecutionResult>;
   resetInterpreter(): Promise<{ replReset: boolean; modulesForgotten: string[] }>;
   runSelfTest(options?: { modules?: boolean }): Promise<SelfTestReport>;
@@ -41,6 +43,8 @@ export interface ZiniaPythonPlugin {
   addListener(eventName: 'output', listener: (event: { chunks: OutputChunk[] }) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'inputRequest', listener: (event: { executionId: string }) => void): Promise<PluginListenerHandle>;
   addListener(eventName: 'packageProgress', listener: (event: PackageProgress) => void): Promise<PluginListenerHandle>;
+  /** Drawing commands from zinia_draw / zinia_3d; `payload` is a JSON string. */
+  addListener(eventName: 'graphics', listener: (event: { payload: string }) => void): Promise<PluginListenerHandle>;
   removeAllListeners(): Promise<void>;
 }
 

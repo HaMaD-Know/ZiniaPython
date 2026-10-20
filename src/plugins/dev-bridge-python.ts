@@ -22,6 +22,7 @@ export class DevBridgePython extends WebPlugin {
   executeFile(o: unknown) { return this.call('executeFile', o); }
   interrupt(o: unknown) { return this.call('interrupt', o); }
   provideInput(o: unknown) { return this.call('provideInput', o); }
+  postGraphicsEvents(o: unknown) { return this.call('postGraphicsEvents', o); }
   replExecute(o: unknown) { return this.call('replExecute', o); }
   resetInterpreter() { return this.call('resetInterpreter'); }
   runSelfTest(o: unknown) { return this.call('runSelfTest', o); }

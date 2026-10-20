@@ -150,6 +150,8 @@ static PyObject *ZPNative_emitEvent(PyObject *self, PyObject *args) {
 @property (atomic, readwrite, copy, nullable) NSString *activeExecutionId;
 - (ZPInputWait *)beginInputWaitForExecution:(NSString *)executionId;
 - (void)endInputWait:(ZPInputWait *)wait;
+@property (nonatomic, readonly) dispatch_semaphore_t uiSemaphore;
+- (NSArray<NSString *> *)takeUIEventsForExecution:(NSString *)executionId;
 @end
 
 static PyObject *ZPNative_readInput(PyObject *self, PyObject *args) {
@@ -175,6 +177,46 @@ static PyObject *ZPNative_readInput(PyObject *self, PyObject *args) {
         Py_RETURN_NONE;
     }
     return PyUnicode_FromString(wait.text.UTF8String);
+}
+
+/// wait_ui(execution_id, timeout) -> list[str]
+/// Returns the UI event batches (JSON strings) the graphics preview posted for
+/// this execution, waiting up to `timeout` seconds (GIL released) when none
+/// are queued. Used by zinia_draw / zinia_3d animation loops.
+static PyObject *ZPNative_waitUI(PyObject *self, PyObject *args) {
+    const char *executionId = NULL;
+    double timeout = 0;
+    if (!PyArg_ParseTuple(args, "sd:wait_ui", &executionId, &timeout)) {
+        return NULL;
+    }
+    if (timeout < 0) timeout = 0;
+    if (timeout > 5) timeout = 5;
+    NSArray<NSString *> *events = nil;
+    @autoreleasepool {
+        NSString *identifier = @(executionId);
+        events = [gInterpreter takeUIEventsForExecution:identifier];
+        if (events.count == 0 && timeout > 0) {
+            dispatch_semaphore_t semaphore = gInterpreter.uiSemaphore;
+            Py_BEGIN_ALLOW_THREADS
+            dispatch_semaphore_wait(semaphore, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(timeout * NSEC_PER_SEC)));
+            Py_END_ALLOW_THREADS
+            events = [gInterpreter takeUIEventsForExecution:identifier];
+        }
+    }
+    PyObject *list = PyList_New(0);
+    if (list == NULL) {
+        return NULL;
+    }
+    for (NSString *batch in events) {
+        PyObject *item = PyUnicode_FromString(batch.UTF8String);
+        if (item == NULL || PyList_Append(list, item) < 0) {
+            Py_XDECREF(item);
+            Py_DECREF(list);
+            return NULL;
+        }
+        Py_DECREF(item);
+    }
+    return list;
 }
 
 static PyObject *ZPNative_httpGet(PyObject *self, PyObject *args) {
@@ -230,6 +272,7 @@ static PyMethodDef ZPNativeMethods[] = {
     {"emit_output", ZPNative_emitOutput, METH_VARARGS, "emit_output(execution_id, stream, text)"},
     {"emit_event", ZPNative_emitEvent, METH_VARARGS, "emit_event(name, payload_json)"},
     {"read_input", ZPNative_readInput, METH_VARARGS, "read_input(execution_id) -> str | None"},
+    {"wait_ui", ZPNative_waitUI, METH_VARARGS, "wait_ui(execution_id, timeout) -> list[str]"},
     {"http_get", ZPNative_httpGet, METH_VARARGS, "http_get(url, timeout, max_bytes) -> (status, bytes)"},
     {NULL, NULL, 0, NULL},
 };
@@ -284,6 +327,9 @@ static PyStatus ZPAppendSearchPath(PyConfig *config, NSString *path) {
     PyThreadState *_savedThreadState;
     PyObject *_handleFunction;
     NSLock *_inputLock;
+    NSLock *_uiLock;
+    NSMutableArray<NSString *> *_uiEvents;
+    NSString *_uiExecution;
     ZPInputWait *_inputWait;
     NSMutableArray *_startCompletions;
     NSString *_runtimeInfo;
@@ -308,6 +354,9 @@ static PyStatus ZPAppendSearchPath(PyConfig *config, NSString *path) {
         _queueCondition = [[NSCondition alloc] init];
         _queue = [NSMutableArray array];
         _inputLock = [[NSLock alloc] init];
+        _uiLock = [[NSLock alloc] init];
+        _uiEvents = [NSMutableArray array];
+        _uiSemaphore = dispatch_semaphore_create(0);
         _startCompletions = [NSMutableArray array];
         _state = ZPInterpreterStateNotStarted;
     }
@@ -592,6 +641,10 @@ static PyStatus ZPAppendSearchPath(PyConfig *config, NSString *path) {
     [self enqueue:^{
         PyEval_RestoreThread(self->_savedThreadState);
         ZPDiscardPendingSignals();
+        [self->_uiLock lock];
+        [self->_uiEvents removeAllObjects];  // nothing from an earlier run reaches this one
+        self->_uiExecution = identifier;
+        [self->_uiLock unlock];
         self.activeExecutionId = identifier;
         NSString *response = nil;
         PyObject *argument = PyUnicode_FromString(json.UTF8String);
@@ -630,6 +683,7 @@ static PyStatus ZPAppendSearchPath(PyConfig *config, NSString *path) {
 
     // Equivalent to pressing Ctrl+C: KeyboardInterrupt at the next bytecode boundary.
     PyErr_SetInterruptEx(SIGINT);
+    dispatch_semaphore_signal(_uiSemaphore);  // wake an animation loop waiting for UI events
     NSString *how = @"keyboard-interrupt";
     // Also deliver a real SIGINT to the interpreter thread so blocking calls such
     // as time.sleep() return early - but only while Python's own handler (or a
@@ -678,6 +732,42 @@ static PyStatus ZPAppendSearchPath(PyConfig *config, NSString *path) {
     dispatch_semaphore_signal(wait.semaphore);
     [_inputLock unlock];
     return YES;
+}
+
+#pragma mark UI events (graphics preview -> Python)
+
+- (BOOL)postUIEvents:(NSString *)eventsJSON forExecution:(NSString *)executionId {
+    NSString *active = self.activeExecutionId;
+    if (active == nil || ![active isEqualToString:executionId]) {
+        return NO;
+    }
+    [_uiLock lock];
+    if (![_uiExecution isEqualToString:executionId]) {
+        [_uiEvents removeAllObjects];
+        _uiExecution = [executionId copy];
+    }
+    if (_uiEvents.count >= 600) {
+        [_uiEvents removeObjectAtIndex:0];  // a stalled script must not grow this without bound
+    }
+    [_uiEvents addObject:[eventsJSON copy]];
+    [_uiLock unlock];
+    dispatch_semaphore_signal(_uiSemaphore);
+    return YES;
+}
+
+- (NSArray<NSString *> *)takeUIEventsForExecution:(NSString *)executionId {
+    // Drop stale wake-ups first: every event queued so far is taken below, and
+    // anything posted after this point signals again, so it is never missed.
+    while (dispatch_semaphore_wait(_uiSemaphore, DISPATCH_TIME_NOW) == 0) {
+    }
+    [_uiLock lock];
+    NSArray<NSString *> *events = @[];
+    if ([_uiExecution isEqualToString:executionId] && _uiEvents.count > 0) {
+        events = [_uiEvents copy];
+        [_uiEvents removeAllObjects];
+    }
+    [_uiLock unlock];
+    return events;
 }
 
 - (BOOL)isWaitingForInput {

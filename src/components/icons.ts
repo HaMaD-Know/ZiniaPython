@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
+  Box,
   Braces,
   Check,
   ChevronDown,
@@ -52,9 +53,11 @@ import {
   Replace,
   RotateCcw,
   Save,
+  Scan,
   ScrollText,
   Search,
   Settings,
+  Shapes,
   Share,
   Square,
   SquareTerminal,
@@ -65,6 +68,8 @@ import {
   Upload,
   WrapText,
   X,
+  ZoomIn,
+  ZoomOut,
   createElement,
   type IconNode,
 } from 'lucide';
@@ -82,6 +87,7 @@ const ICONS = {
   restart: RotateCcw, save: Save, log: ScrollText, search: Search, settings: Settings, share: Share,
   stop: Square, terminal: SquareTerminal, sun: Sun, trash: Trash2, warning: TriangleAlert, undo: Undo2,
   upload: Upload, wrap: WrapText, close: X,
+  cube: Box, shapes: Shapes, recenter: Scan, zoomIn: ZoomIn, zoomOut: ZoomOut,
 } satisfies Record<string, IconNode>;
 
 export type IconName = keyof typeof ICONS;

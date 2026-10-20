@@ -22,6 +22,7 @@ public class ZiniaPythonPlugin: CAPPlugin, CAPBridgedPlugin, ZPInterpreterDelega
         CAPPluginMethod(name: "executeFile", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "interrupt", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "provideInput", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "postGraphicsEvents", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "replExecute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "resetInterpreter", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "runSelfTest", returnType: CAPPluginReturnPromise),
@@ -287,6 +288,18 @@ public class ZiniaPythonPlugin: CAPPlugin, CAPBridgedPlugin, ZPInterpreterDelega
         call.resolve(["accepted": accepted])
     }
 
+    /// Touch, key and frame-acknowledgement events from the graphics preview,
+    /// delivered to a running zinia_draw / zinia_3d program (see wait_ui).
+    @objc func postGraphicsEvents(_ call: CAPPluginCall) {
+        guard let executionId = requireExecutionId(call),
+              let events = requireString(call, "events", maxBytes: 1_000_000) else { return }
+        guard events.hasPrefix("[") else {
+            call.reject("'events' must be a JSON array.", "INVALID_ARGUMENT")
+            return
+        }
+        call.resolve(["accepted": interpreter.postUIEvents(events, executionId: executionId)])
+    }
+
     // MARK: - Packages
 
     @objc func listPackages(_ call: CAPPluginCall) {
@@ -494,6 +507,14 @@ public class ZiniaPythonPlugin: CAPPlugin, CAPBridgedPlugin, ZPInterpreterDelega
     }
 
     public func interpreterDidEmitEvent(_ name: String, payloadJSON: String) {
+        if name == "graphics" {
+            // Drawing commands stay a JSON string; the web renderer parses them.
+            // Main-queue delivery keeps them in the order Python sent them.
+            DispatchQueue.main.async { [weak self] in
+                self?.notifyListeners("graphics", data: ["payload": payloadJSON])
+            }
+            return
+        }
         guard name == "packageProgress", let payload = parse(payloadJSON) else { return }
         DispatchQueue.main.async { [weak self] in
             self?.notifyListeners(name, data: payload)

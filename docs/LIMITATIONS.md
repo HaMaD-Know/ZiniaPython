@@ -15,6 +15,14 @@ These come from iOS itself, from CPython's iOS support, or from the design choic
 - **Background.** iOS suspends apps in the background. A running script pauses while ZiniaPython isn't in the foreground, and servers started by scripts aren't reachable then.
 - **Stack depth.** The interpreter thread has an 8 MB stack. The default recursion limit (1000) is safe; raising it far beyond can crash.
 
+## Graphics
+
+- **No `tkinter` or `turtle`.** Use `zinia_draw` and `zinia_3d` instead ([GRAPHICS.md](GRAPHICS.md)).
+- **Frame rate depends on the program.** Every frame crosses from Python to the web view and back. The preview shows the measured rate; nothing guarantees 60 frames per second.
+- **Touch and key events reach Python only while `run_animation()` runs.**
+- **No images, textures, sprites, shadows or 3D model files (GLB/GLTF).**
+- **3D needs WebGL.** If it is unavailable, the 3D preview says so; 2D still works.
+
 ## Standard library
 
 Present and working: everything in the self-test's module list except the modules below. That includes `json`, `math`, `pathlib`, `sqlite3`, `ssl`, `hashlib`, `zlib`/`bz2`/`lzma`/`compression.zstd`, `ctypes`, `asyncio`, `threading`, `socket`, `urllib.request`, `decimal`, `unittest`, `zoneinfo` and `xml`. The self-test (*Settings › Python runtime*) shows the real status on your device.

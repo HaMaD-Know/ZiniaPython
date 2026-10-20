@@ -74,6 +74,12 @@ While a script runs, the plugin polls `os_proc_available_memory()` every 0.5 s a
 
 See [PACKAGES.md](PACKAGES.md). In short: `python/zinia/packages.py` uses PyPI's JSON API through `URLSession` (the iOS trust store). It installs only pure-Python wheels, verifies SHA-256, unpacks into `Application Support/ZiniaPython/site-packages` with path-traversal checks, records a `RECORD` file, and uninstalls exactly those files.
 
+## Graphics
+
+`zinia_draw` and `zinia_3d` (in `python/`, copied into the app's `python-app/`) collect drawing commands and send them as JSON batches with `_zinia_native.emit_event("graphics", ...)`. The plugin forwards them on the main queue as the `graphics` event, so they arrive in order. `src/graphics/GraphicsController.ts` drops batches from any execution other than the current run, and routes the rest to the 2D canvas renderer or the Three.js scene (`GraphicsPanel.ts`).
+
+Input goes the other way. The panel posts touches, keys and per-frame acknowledgements with `postGraphicsEvents`. `ZPInterpreter` queues them for the active execution only (at most 600 batches, cleared when a request starts). `_zinia_native.wait_ui()` hands them to Python, waiting with the GIL released. `run_animation()` runs on the interpreter thread, waits for each frame's acknowledgement (at most 0.5 s), and is woken by Stop. Details: [GRAPHICS.md](GRAPHICS.md).
+
 ## Desktop development bridge
 
 `npm run dev:bridge` starts the Vite dev server in mode `bridge`. The plugin in `vite-dev-bridge.ts` runs `scripts/dev-bridge-worker.py` with the developer's own Python. That worker loads the same `python/zinia` package and provides a desktop stand-in for `_zinia_native`. Requests need the `X-Zinia-Dev: 1` header, so other websites can't use the bridge. The bridge exists only in the dev server: production builds constant-fold `import.meta.env.DEV` to `false` and drop it entirely.

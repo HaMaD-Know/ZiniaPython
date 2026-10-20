@@ -3,6 +3,7 @@ import './styles/base.css';
 import './styles/layout.css';
 import './styles/components.css';
 import './styles/console.css';
+import './styles/graphics.css';
 import { ZiniaApp } from './app/App';
 
 const root = document.getElementById('app');

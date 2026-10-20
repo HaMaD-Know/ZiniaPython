@@ -52,8 +52,8 @@ Problems found and fixed on the way to this run (runs 1–6): a desktop test tha
 | --- | --- | --- | --- |
 | 1 | `npm run lint` | passed | ESLint, no errors |
 | 2 | `npm run typecheck` | passed | TypeScript 6.0.3, strict mode |
-| 3 | `npm test` | **39 / 39 passed** (7 files) | Frontend logic; see the details below |
-| 4 | `python -I python/tests/run_tests.py` | **67 passed, 1 skipped** | Runtime engine on real CPython 3.12 |
+| 3 | `npm test` | **56 / 56 passed** (8 files) | Frontend logic, including the graphics preview; see the details below |
+| 4 | `python -I python/tests/run_tests.py` | **85 passed, 2 skipped** (87 tests) | Runtime engine and graphics modules on real CPython 3.12 |
 | 5 | same with `ZINIA_NETWORK_TESTS=1` | **68 / 68 passed** | Including live PyPI analysis (six installable; numpy native-only) |
 | 6 | `npm run check:ios` | **77 / 77 checks passed** | Xcode project wiring (below) |
 | 7 | `scripts/fetch-python-runtime.ps1` | passed | Download + SHA-256 `157a6b95…e0a3` verified + extraction on Windows |
@@ -74,6 +74,29 @@ Problems found and fixed on the way to this run (runs 1–6): a desktop test tha
 **iOS project wiring (77 checks):** every native source file is compiled; every file reference exists; `Python.xcframework` is linked weakly and embedded with code signing; the build phases are present and ordered (Resources → Install runtime package → Process Python libraries → Embed Frameworks); the required build settings are set in Debug and Release; **both plugins are registered** in `ZiniaBridgeViewController`, which `SceneDelegate` and `Main.storyboard` use; **the method names in the Swift plugins match the TypeScript interfaces exactly, and each has an `@objc` implementation**; the bridging header, Info.plist keys, lock file and the interpreter configuration flags required by the CPython docs are all present; the bundle identifiers match.
 
 **CPython iOS framework (27 checks):** `ios-arm64` slice: arm64, LC_BUILD_VERSION platform *iOS*, minimum 13.0. `ios-arm64_x86_64-simulator`: arm64 (iOS Simulator, 14.0) and x86_64 (iOS Simulator, 13.0). The headers declare Python 3.14.8, matching the lock file. Each architecture has 67 compiled stdlib modules (`_ssl` checked per architecture), the standard library has 2,427 files, and the build helper and plist template are present.
+
+## Graphics engine (zinia_draw, zinia_3d)
+
+| Check | Result | Where it ran |
+| --- | --- | --- |
+| `python/tests/test_graphics.py` (17 tests): ordered command batches for the spec's 2D and 3D examples, outline/fill, colours, errors pointing at the user's line, animation with simulated touches and keys, `stop_animation`, fps validation, fresh state per run, drawing sent after an error, coalesced 3D changes, remove, validation, tap → object, REPL drawing, **all 12 examples run** | passed | desktop CPython 3.12 |
+| `tests/unit/graphics.test.ts` (17 tests): 2D renderer draw order and replay, `set_background`/`clear` retention, canvas fitting and backing-store limit, pointer mapping, stale-run filtering, REPL batches, once-per-frame event posting with move coalescing, nothing posted after a run, malformed payloads, 3D scene model add/set/remove/dispose, default lights, camera home, bad commands | passed | Vitest (jsdom, no WebGL) |
+| Self-test case "Graphics modules zinia_draw and zinia_3d" | passes on desktop CPython | **iOS: runs in the next CI simulator self-test** |
+| Browser walkthrough, desktop bridge (below) | passed | Chromium-based browser pane, desktop CPython |
+| On an iPhone or iPad | **not run** | no device available |
+
+Browser walkthrough through `npm run dev:bridge`:
+
+- **⋯ › Graphics examples** created the *Graphics Examples* project with 12 programs and opened the first.
+- `01_shapes_and_colors.py` → the preview opened beside the editor and showed every shape; the console printed the canvas size.
+- `07_rotating_cube.py` → Three.js loaded on first use, the cube rotated, about 40 frames/s measured through the HTTP bridge. **Stop** → *Stopped by KeyboardInterrupt*, the traceback ends at the user's `run_animation` line.
+- `11_object_viewer.py` → clicking the sphere printed `Selected blue sphere at (0.0, 1.0, 0.0)` (raycast tap → Python callback).
+- iPhone-sized viewport (375×812): the preview covered the editor with the console still visible; two drags on `05_drawing_canvas.py` were drawn by Python; closing the preview returned to the editor and reopening it showed the same picture; fullscreen covered the whole screen and Escape left it.
+- REPL: `create_canvas`, `set_background('white')`, a red circle → canvas pixels read back as white at the corner and red in the centre.
+
+Found and fixed during this walkthrough: `set_background()` before the first frame did not repaint (it now fills the canvas); validation errors pointed into `zinia_draw.py` (they now point at the user's line); events of the other surface could reach the wrong handler (they are now filtered by surface).
+
+Frame rates above were measured with the browser pane in the foreground. When the pane was in the background the browser throttled `requestAnimationFrame` and the measured rate fell to 2 frames/s (the 0.5 s acknowledgement timeout), as designed.
 
 ### Manual UI walkthrough (desktop development bridge)
 

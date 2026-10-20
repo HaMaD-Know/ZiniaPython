@@ -105,6 +105,12 @@ typedef NS_ENUM(NSInteger, ZPInterpreterState) {
 /// YES while the active execution is blocked in input().
 - (BOOL)isWaitingForInput;
 
+/// Queues a batch of UI events (a JSON array string) from the graphics
+/// preview for the running execution; zinia_draw / zinia_3d read them with
+/// _zinia_native.wait_ui(). Returns NO when `executionId` is not running.
+- (BOOL)postUIEvents:(NSString *)eventsJSON forExecution:(NSString *)executionId
+    NS_SWIFT_NAME(postUIEvents(_:executionId:));
+
 @end
 
 NS_ASSUME_NONNULL_END

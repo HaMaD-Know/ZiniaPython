@@ -47,6 +47,8 @@ export class PythonService {
   startError: RuntimeError | null = null;
   /** Output that arrived for no active run (for example from a background thread). */
   onBackgroundOutput: ((stream: OutputStreamName, text: string) => void) | null = null;
+  /** Drawing batches from zinia_draw / zinia_3d (JSON strings, in order). */
+  onGraphics: ((payload: string) => void) | null = null;
 
   private observers = new Map<string, RunObserver>();
   private handles: PluginListenerHandle[] = [];
@@ -96,6 +98,11 @@ export class PythonService {
           this.observers.get(executionId)?.onInputRequest();
         }),
       );
+      this.handles.push(
+        await ZiniaPython.addListener('graphics', ({ payload }) => {
+          if (typeof payload === 'string') this.onGraphics?.(payload);
+        }),
+      );
     } catch {
       // The web build without a runtime has no events; start() reports why.
     }
@@ -119,8 +126,14 @@ export class PythonService {
     return this.track(executionId, label, true, observer, () => ZiniaPython.execute({ ...options, executionId }), true);
   }
 
-  async runRepl(source: string, mode: 'line' | 'block', cwd: string | undefined, projectRoot: string | undefined, observer: RunObserver): Promise<PythonExecutionResult> {
-    const executionId = newExecutionId('repl');
+  async runRepl(
+    source: string,
+    mode: 'line' | 'block',
+    cwd: string | undefined,
+    projectRoot: string | undefined,
+    observer: RunObserver,
+    executionId: string = newExecutionId('repl'),
+  ): Promise<PythonExecutionResult> {
     return this.track(executionId, 'REPL', true, observer, () =>
       ZiniaPython.replExecute({ executionId, source, mode, workingDirectory: cwd, projectRoot }), false);
   }
@@ -202,6 +215,12 @@ export class PythonService {
 
   async provideInput(executionId: string, text: string | null): Promise<boolean> {
     const result = await ZiniaPython.provideInput(text === null ? { executionId, eof: true } : { executionId, text });
+    return result.accepted;
+  }
+
+  /** Touch/key events and frame acknowledgements for a running graphics program. */
+  async postGraphicsEvents(executionId: string, events: string): Promise<boolean> {
+    const result = await ZiniaPython.postGraphicsEvents({ executionId, events });
     return result.accepted;
   }
 

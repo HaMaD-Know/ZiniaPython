@@ -40,6 +40,7 @@ Versions of the bundled libraries come from the `VERSIONS` file in the support p
 | @lezer/common, highlight, lr, python | 1.x | MIT |
 | @codemirror/streamparser, style-mod, w3c-keyname, crelt, @marijn/find-cluster-break | – | MIT |
 | lucide (icons) | 1.59.0 | ISC |
+| three (3D graphics, loaded when a program uses zinia_3d) | 0.186.1 | MIT |
 | tslib | 2.8.1 | 0BSD |
 
 ### Native (Swift Package Manager)

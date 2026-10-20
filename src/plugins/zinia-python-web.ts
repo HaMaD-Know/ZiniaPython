@@ -21,6 +21,7 @@ class UnavailablePython extends WebPlugin {
   async executeFile(): Promise<never> { this.fail(); }
   async interrupt(): Promise<never> { this.fail(); }
   async provideInput(): Promise<never> { this.fail(); }
+  async postGraphicsEvents(): Promise<never> { this.fail(); }
   async replExecute(): Promise<never> { this.fail(); }
   async resetInterpreter(): Promise<never> { this.fail(); }
   async runSelfTest(): Promise<never> { this.fail(); }

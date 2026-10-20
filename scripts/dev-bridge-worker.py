@@ -56,7 +56,8 @@ def _emit_output(execution_id, stream, text):
 
 
 def _emit_event(name, payload):
-    event(name, json.loads(payload))
+    # Same shape as ZiniaPythonPlugin.swift: graphics payloads stay a JSON string.
+    event(name, {"payload": payload} if name == "graphics" else json.loads(payload))
 
 
 def _read_input(execution_id):
@@ -75,6 +76,25 @@ def _read_input(execution_id):
     return text
 
 
+class UIState:
+    lock = threading.Lock()
+    batches = []
+    ready = threading.Event()
+
+
+def _wait_ui(execution_id, timeout):
+    # Stand-in for ZPInterpreter's UI event queue.
+    with UIState.lock:
+        if not UIState.batches:
+            UIState.ready.clear()
+    if timeout > 0:
+        UIState.ready.wait(min(timeout, 5))
+    with UIState.lock:
+        batches, UIState.batches = UIState.batches, []
+        UIState.ready.clear()
+    return batches
+
+
 def _http_get(url, timeout, max_bytes):
     return None  # zinia.packages falls back to urllib on desktop
 
@@ -84,10 +104,15 @@ fake.emit_output = _emit_output
 fake.emit_event = _emit_event
 fake.read_input = _read_input
 fake.http_get = _http_get
+fake.wait_ui = _wait_ui
 sys.modules["_zinia_native"] = fake
 sys.path.insert(0, os.path.join(REPO, "python"))
 
 from zinia import bridge  # noqa: E402  (must follow the fake native module)
+from zinia import errors  # noqa: E402
+
+# This file stands in for native code: keep it out of user tracebacks.
+errors.add_library_dir(os.path.dirname(os.path.abspath(__file__)))
 
 State = types.SimpleNamespace(active=None, started=None, info=None)
 requests = queue.Queue()
@@ -111,9 +136,18 @@ def reader():
                     mechanism = "input-cancelled"
                 else:
                     _thread.interrupt_main()
+                    UIState.ready.set()  # wake an animation loop waiting for UI events
                     mechanism = "keyboard-interrupt"
             send({"type": "response", "id": msg["id"], "ok": True,
                   "result": {"interrupted": mechanism != "none", "mechanism": mechanism}})
+        elif kind == "ui":
+            accepted = bool(State.active) and msg.get("executionId") == State.active
+            if accepted:
+                with UIState.lock:
+                    UIState.batches.append(str(msg.get("events") or "[]"))
+                    del UIState.batches[:-600]
+                UIState.ready.set()
+            send({"type": "response", "id": msg["id"], "ok": True, "result": {"accepted": accepted}})
         elif kind == "input":
             accepted = False
             with InputState.lock:

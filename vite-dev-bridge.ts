@@ -203,6 +203,9 @@ export function ziniaDevBridge(repoRoot: string): Plugin {
         }
         if (kind !== 'python') return next();
         if (method === 'interrupt') return json(res, await send({ type: 'interrupt', executionId: body.executionId }));
+        if (method === 'postGraphicsEvents') {
+          return json(res, await send({ type: 'ui', executionId: body.executionId, events: body.events }));
+        }
         if (method === 'provideInput') {
           return json(res, await send({ type: 'input', executionId: body.executionId, text: body.eof ? null : (body.text ?? '') }));
         }

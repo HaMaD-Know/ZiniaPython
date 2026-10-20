@@ -58,3 +58,14 @@ def http_get(url: str, timeout: float, max_bytes: int):
     if _native is None:
         return None
     return _native.http_get(url, float(timeout), int(max_bytes))
+
+
+def wait_ui(execution_id: str, timeout: float) -> list:
+    """Event batches (JSON strings) posted by the graphics preview.
+
+    Waits up to ``timeout`` seconds when none are queued. Returns ``[]`` when
+    there is no host (desktop tests), so callers never block there.
+    """
+    if _native is None or not hasattr(_native, "wait_ui"):
+        return []
+    return _native.wait_ui(execution_id, float(timeout))

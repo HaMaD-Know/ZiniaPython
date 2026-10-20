@@ -138,6 +138,29 @@ export class ProjectService {
     return { project, entry: { root: 'workspace', path: join(folder, entryName) } };
   }
 
+  /**
+   * Create (or complete) a project from bundled files. Files that already
+   * exist are left alone, so edits to an example are never overwritten.
+   */
+  async installBundled(name: string, files: Record<string, string>, entry: string): Promise<{ project: ProjectRef; added: number }> {
+    const provider = this.workspace.provider('workspace');
+    const existing = await provider.stat(name);
+    if (existing && existing.type !== 'directory') throw new Error(`A file named "${name}" is in the way.`);
+    if (!existing) await provider.mkdir(name);
+    let added = 0;
+    for (const [rel, text] of Object.entries(files)) {
+      const path = join(name, rel);
+      if (await provider.stat(path)) continue;
+      const parent = dirname(path);
+      if (parent !== name && !(await provider.stat(parent))) await provider.mkdir(parent);
+      await provider.write(path, text, { overwrite: false });
+      added += 1;
+    }
+    const project = { root: 'workspace', path: name };
+    if (!(await provider.stat(join(name, CONFIG_PATH)))) await this.saveConfig(project, defaultConfig(name, entry));
+    return { project, added };
+  }
+
   async loadConfig(project: ProjectRef): Promise<ProjectConfig> {
     const provider = this.workspace.provider(project.root);
     const fallbackName = project.path || this.workspace.root(project.root).name;

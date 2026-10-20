@@ -18,7 +18,11 @@ fi
 
 mkdir -p "$CODESIGNING_FOLDER_PATH/python-app"
 rsync -a --delete --exclude '__pycache__' --exclude '*.pyc' "$SOURCE/" "$DEST/"
-echo "Installed ZiniaPython runtime package into python-app/zinia"
+# The graphics modules users import directly: import zinia_draw / zinia_3d
+for module in zinia_draw.py zinia_3d.py; do
+    cp "$REPO_ROOT/python/$module" "$CODESIGNING_FOLDER_PATH/python-app/$module"
+done
+echo "Installed ZiniaPython runtime package into python-app/ (zinia, zinia_draw, zinia_3d)"
 
 # Optional: build-time packages, one folder per platform because compiled
 # modules differ between device (iphoneos) and simulator (iphonesimulator).

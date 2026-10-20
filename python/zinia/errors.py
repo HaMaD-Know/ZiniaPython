@@ -10,6 +10,11 @@ import traceback
 from . import module_info
 
 _PACKAGE_DIR = os.path.normcase(os.path.dirname(os.path.abspath(__file__))) + os.sep
+# The graphics modules live next to the package (importable as plain
+# ``zinia_draw`` / ``zinia_3d``) but are runtime code, not the user's.
+_RUNTIME_MODULES = tuple(
+    os.path.normcase(os.path.join(os.path.dirname(_PACKAGE_DIR.rstrip(os.sep)), name))
+    for name in ("zinia_draw.py", "zinia_3d.py"))
 
 
 def stdlib_dir() -> str:
@@ -61,7 +66,8 @@ def is_internal(filename: str) -> bool:
     """True for frames that belong to ZiniaPython's own runtime code."""
     if not filename or filename.startswith("<"):
         return False
-    return os.path.normcase(os.path.abspath(filename)).startswith(_PACKAGE_DIR)
+    path = os.path.normcase(os.path.abspath(filename))
+    return path.startswith(_PACKAGE_DIR) or path in _RUNTIME_MODULES
 
 
 def is_library(filename: str) -> bool:
@@ -75,11 +81,29 @@ def is_library(filename: str) -> bool:
 
 
 def _strip_internal(exc: BaseException) -> None:
-    """Drop leading traceback entries that point into the zinia package."""
+    """Drop traceback entries that point into ZiniaPython's own code.
+
+    Leading entries are the runner itself. Trailing entries are inside the
+    runtime (for example a zinia_draw argument check), so the traceback ends
+    at the user's line that called it. When the program was stopped, trailing
+    library frames (wherever the program happened to be waiting) are dropped
+    as well.
+    """
     tb = exc.__traceback__
     while tb is not None and is_internal(tb.tb_frame.f_code.co_filename):
         tb = tb.tb_next
     exc.__traceback__ = tb
+    if tb is None:
+        return
+    trailing = is_library if isinstance(exc, KeyboardInterrupt) else is_internal
+    last_kept = None
+    entry = tb
+    while entry is not None:
+        if not trailing(entry.tb_frame.f_code.co_filename):
+            last_kept = entry
+        entry = entry.tb_next
+    if last_kept is not None:
+        last_kept.tb_next = None
 
 
 def _type_name(exc: BaseException) -> str:

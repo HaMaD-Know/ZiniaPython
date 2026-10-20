@@ -55,6 +55,13 @@ SCRIPT_CASES = [
     ("stdin", "input() with supplied stdin", 'name = input("Name? ")\nprint("Hi", name)\n', "Name? Hi Ada\n"),
     ("main-guard", "__name__ == '__main__'", 'if __name__ == "__main__":\n    print("main")\n', "main\n"),
     ("sys-exit", "sys.exit(3)", "import sys\nsys.exit(3)\n", ""),
+    ("graphics", "Graphics modules zinia_draw and zinia_3d",
+     "import zinia_draw as gfx\nimport zinia_3d as scene\ngfx.create_canvas(200, 100)\n"
+     "gfx.rectangle(10, 10, 50, 30, color='#ff00aa')\ngfx.circle(100, 50, 20, color='cyan')\n"
+     "gfx.text(5, 80, 'ok', size=12)\ngfx.show()\nscene.create_scene()\n"
+     "box = scene.add_box(width=2, height=2, depth=2, color='#00ffff')\nbox.rotate(0, 0.5, 0)\n"
+     "scene.add_light('ambient', intensity=0.7)\nscene.set_camera(position=(6, 5, 8))\nscene.show()\n"
+     "print(gfx.size(), len(scene.objects()))\n", "(200, 100) 2\n"),
 ]
 
 

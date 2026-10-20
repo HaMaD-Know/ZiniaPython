@@ -35,7 +35,7 @@ import types
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
-from . import errors, streams
+from . import errors, graphics, streams
 
 _PROTECTED_MODULES = {"__main__", "builtins", "sys"}
 
@@ -223,6 +223,7 @@ def run_script(req: RunRequest, *, user_roots=()) -> dict:
 
     with streams.activate(sink), interpreter_state_guard():
         purge_user_modules(roots)
+        graphics.begin_run()  # no canvas, scene or handler survives from the previous run
         main = types.ModuleType("__main__")
         main.__dict__.update({
             "__builtins__": builtins,
@@ -266,6 +267,7 @@ def run_script(req: RunRequest, *, user_roots=()) -> dict:
             status = "interrupted"
             error = errors.describe(exc, user_files=(filename,))
         finally:
+            graphics.end_run()  # send drawing that was never show()n
             linecache.cache.pop(filename, None)
             purge_user_modules(roots)
 
