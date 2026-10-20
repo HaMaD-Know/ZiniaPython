@@ -10,7 +10,7 @@ A Python IDE for iPhone and iPad. You write Python in a CodeMirror 6 editor, and
 | Runtime engine | `python/zinia`: output streaming, tracebacks, REPL, self-test and package installer, written in Python and tested on desktop CPython |
 | Builds | GitHub Actions on macOS: simulator build plus an **embedded-Python self-test**, an unsigned device IPA, and an optional signed IPA |
 
-> **Status:** everything that can be checked without a Mac has been checked: 67 runtime tests, 39 frontend tests, 77 iOS-project wiring checks and 27 checks of the real CPython iOS framework. The iOS app itself still needs its first build in GitHub Actions. See [docs/VERIFICATION-REPORT.md](docs/VERIFICATION-REPORT.md) for exactly what ran and what did not.
+> **Status:** GitHub Actions builds the app and runs CPython 3.14.8 inside it on the iOS Simulator: all 15 self-test checks pass. It has not yet been installed on a physical device. See [docs/VERIFICATION-REPORT.md](docs/VERIFICATION-REPORT.md) for exactly what ran and what did not.
 
 ---
 

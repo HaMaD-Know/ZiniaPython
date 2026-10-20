@@ -11,7 +11,40 @@ Date: 2026-10-20. Written to separate **what was executed and passed** from **wh
 | Desktop Python | CPython 3.12.10 (Windows, AMD64) |
 | Git | 2.55.0.windows.5 |
 
-**Consequence:** the Swift and Objective-C code and the Xcode project **have not been compiled here**, and no iOS app has been built, installed or run. Those steps run in `.github/workflows/build-ios.yml` on GitHub's macOS runners. That workflow has not been run yet, because this environment has no GitHub repository.
+Swift and Objective-C can't be compiled on Windows. They are built in `.github/workflows/build-ios.yml` on GitHub's macOS runners; the results of those runs are in the next section.
+
+## iOS build and on-simulator self-test (GitHub Actions)
+
+Repository: https://github.com/HaMaD-Know/ZiniaPython. First fully green run: [Build iOS #7](https://github.com/HaMaD-Know/ZiniaPython/actions/runs/39378527509), commit `fa03bc0`, macOS 26 runner, Xcode 26.5.
+
+| Step | Result |
+| --- | --- |
+| Lint, type check, frontend tests, runtime tests (macOS, CPython 3.14) | passed |
+| iOS project wiring, framework fetch + SHA-256, `lipo` architectures | passed |
+| **Simulator build** (Swift + Objective-C compiled and linked, Python build phases) | passed |
+| Simulator app bundle check (Python.framework, stdlib, extension frameworks, runtime package, web UI) | passed |
+| **Embedded-Python self-test inside the app on the iOS Simulator** | **passed** |
+| **Device build** (arm64, Release, unsigned) + bundle check + `ZiniaPython-unsigned.ipa` | passed |
+| Signed IPA | skipped: no signing secrets configured |
+
+Self-test report published by the run:
+
+```
+Python 3.14.8 (CPython) on iOS 26.5, machine arm64
+Initialized: True, start-up 3543 ms
+Missing-runtime diagnostic detected: True
+PASS  Hello World                     PASS  Output before an exception
+PASS  Arithmetic                      PASS  input() with supplied stdin
+PASS  Loop                            PASS  __name__ == '__main__'
+PASS  Standard library                PASS  sys.exit(3)
+PASS  Functions                       PASS  Import a helper module from the project
+PASS  Syntax error                    PASS  Create, read, rename and delete a file
+PASS  Runtime error                   PASS  Stop a long-running loop
+PASS  Missing module
+Modules importable: 94/99; unavailable: tkinter, turtle, curses, readline, dbm.gnu
+```
+
+Problems found and fixed on the way to this run (runs 1–6): a desktop test that assumed Linux paths on macOS (`/var` vs `/private/var`); module purging across both path forms; the bundled runtime folder renamed from `app` to `python-app` (it clashed with the `App` executable on case-insensitive file systems); a `sysconfig` exception and frozen `os` (no `os.__file__`) in the embedded runtime; and CI reading the full self-test report from the app container. The 3.5 s start-up was measured on a cold simulator; device timing hasn't been measured.
 
 ## Executed checks and results
 
@@ -63,47 +96,47 @@ One finding came from this walkthrough. The first `import numpy` on this PC took
 
 | Test | Status | Evidence |
 | --- | --- | --- |
-| 1 Hello World | **PASSED** (desktop CPython) · NOT RUN on iOS | `test_01_hello_world`; UI walkthrough; part of the CI simulator self-test |
-| 2 Arithmetic | **PASSED** (desktop) · NOT RUN on iOS | `test_02_arithmetic` |
-| 3 Loop | **PASSED** (desktop) · NOT RUN on iOS | `test_03_loop` |
-| 4 Standard library | **PASSED** (desktop) · NOT RUN on iOS | `test_04_standard_library` |
-| 5 Functions | **PASSED** (desktop) · NOT RUN on iOS | `test_05_functions` |
-| 6 Syntax error | **PASSED** (desktop) · NOT RUN on iOS | `test_06_syntax_error` (line 1, offset 12) |
-| 7 Runtime error | **PASSED** (desktop + UI) · NOT RUN on iOS | `test_07_runtime_error_traceback`; UI traceback |
-| 8 User modules | **PASSED** (desktop + UI) · NOT RUN on iOS | `test_08*`; starter project run in the UI |
-| 9 Filesystem | **PASSED** (Python level + Capacitor Filesystem web implementation) · NOT RUN with the iOS Filesystem implementation | `test_09_*`, `workspace.test.ts` |
+| 1 Hello World | **PASSED** (desktop CPython and **iOS Simulator**) | `test_01_hello_world`; UI walkthrough; part of the CI simulator self-test |
+| 2 Arithmetic | **PASSED** (desktop and **iOS Simulator**) | `test_02_arithmetic` |
+| 3 Loop | **PASSED** (desktop and **iOS Simulator**) | `test_03_loop` |
+| 4 Standard library | **PASSED** (desktop and **iOS Simulator**) | `test_04_standard_library` |
+| 5 Functions | **PASSED** (desktop and **iOS Simulator**) | `test_05_functions` |
+| 6 Syntax error | **PASSED** (desktop and **iOS Simulator**) | `test_06_syntax_error` (line 1, offset 12) |
+| 7 Runtime error | **PASSED** (desktop + UI + **iOS Simulator**) | `test_07_runtime_error_traceback`; UI traceback |
+| 8 User modules | **PASSED** (desktop + UI + **iOS Simulator**) | `test_08*`; starter project run in the UI |
+| 9 Filesystem | **PASSED** (Python level on desktop and iOS Simulator; Capacitor Filesystem web implementation) · iOS Filesystem plugin from the UI not run | `test_09_*`, `workspace.test.ts` |
 | 10 Persistence | **PASSED** (unit tests + UI reload + package persisted on disk) · NOT RUN on iOS | `settings.test.ts`, `tabsModel.test.ts`, `workspace.test.ts` |
-| 11 Long-running script / Stop | **PASSED** (desktop interrupt + UI Stop + service contract) · NOT RUN on iOS | `test_11_busy_loop_is_interrupted`. The iOS-specific `PyErr_SetInterruptEx` + `pthread_kill` path hasn't been executed. |
-| 12 Missing module | **PASSED** (desktop + REPL in UI) · NOT RUN on iOS | `test_12_missing_module` |
+| 11 Long-running script / Stop | **PASSED** (desktop + UI Stop + service contract + KeyboardInterrupt on the **iOS Simulator**) | `test_11_busy_loop_is_interrupted`. The iOS-specific `PyErr_SetInterruptEx` + `pthread_kill` path hasn't been executed. |
+| 12 Missing module | **PASSED** (desktop + REPL in UI + **iOS Simulator**) | `test_12_missing_module` |
 | 13 Document picker | **NOT RUN** | Needs an iOS device or simulator with user interaction and Apple's picker UI. Implemented in `ZiniaFilesPlugin.swift`. |
 | 14 Multiple tabs | **PASSED** | `tabsModel.test.ts`, UI walkthrough |
-| 15 Runtime initialization failure | **PASSED** (frontend diagnostic + web `UNAVAILABLE` path) · NOT RUN natively | `pythonService.test.ts`. The native bundle-layout check is part of the CI simulator self-test (`missingRuntimeDiagnostic`) and of the `-ZiniaSimulateMissingStdlib YES` launch argument. |
+| 15 Runtime initialization failure | **PASSED** (frontend diagnostic, web `UNAVAILABLE` path, and native bundle-layout diagnostic on the **iOS Simulator**) | `pythonService.test.ts`. The native bundle-layout check is part of the CI simulator self-test (`missingRuntimeDiagnostic`) and of the `-ZiniaSimulateMissingStdlib YES` launch argument. |
 
-"NOT RUN on iOS" means the CI simulator self-test (`run-simulator-selftest.sh`) covers it but hasn't been run yet. That self-test executes cases 1–8, 9 (Python level), 11 (busy-loop interrupt), 12, the missing-runtime diagnostic, and 99 module imports inside the real embedded runtime.
+"iOS Simulator" means the case ran inside the real app through `ZiniaSelfTestRunner` in CI. Physical devices haven't been tested. That self-test executes cases 1–8, 9 (Python level), 11 (busy-loop interrupt), 12, the missing-runtime diagnostic, and 99 module imports inside the real embedded runtime.
 
 ## Quality gates (section 20)
 
 1. **Is the editor functional?** Yes, in a browser (CodeMirror 6: highlighting, tabs, find/replace, completions, Run). Not yet on iOS.
-2. **Is the native Capacitor plugin registered?** Yes: `ZiniaBridgeViewController.capacitorDidLoad()` calls `registerPluginInstance` for both plugins, and the static checks confirm the wiring and the method parity with TypeScript. It hasn't been compiled yet.
-3. **Is CPython actually bundled, or only planned?** The build **integrates a real, verified CPython 3.14.8 iOS framework**: pinned and checksummed, with architectures verified, linked and embedded by the project, and the stdlib installed by a build phase. An app bundle containing it hasn't been produced yet in this environment. `verify-app-bundle.sh` checks this in CI.
+2. **Is the native Capacitor plugin registered?** Yes: `ZiniaBridgeViewController.capacitorDidLoad()` calls `registerPluginInstance` for both plugins, and the static checks confirm the wiring and the method parity with TypeScript. It compiles and runs: the simulator self-test goes through it.
+3. **Is CPython actually bundled, or only planned?** The build **integrates a real, verified CPython 3.14.8 iOS framework**: pinned and checksummed, with architectures verified, linked and embedded by the project, and the stdlib installed by a build phase. Bundled for real: `verify-app-bundle.sh` confirmed Python.framework, the standard library and the converted extension frameworks in both the simulator and device builds, and CPython 3.14.8 ran inside the app.
 4. **Does Run call the real interpreter?** Yes. `ZiniaApp.runTab` → `PythonService.runScript` → `ZiniaPython.execute` → `ZiniaPythonPlugin.execute` → `ZPInterpreter submit` → `zinia.bridge.handle` → `executor.run_script`. There's no fallback: the web build rejects with `UNAVAILABLE` (observed).
-5. **Does output appear in the console?** Yes with desktop CPython (UI walkthrough). The iOS event path (`emit_output` → batcher → `output` event) isn't executed yet.
+5. **Does output appear in the console?** Yes with desktop CPython (UI walkthrough). Inside the app the runtime ran the self-test scripts and captured their output; the visual console on iOS hasn't been checked by a person yet.
 6. **Are tracebacks returned correctly?** Yes: real CPython tracebacks, structured frames and location (tests and UI).
 7. **Are files saved locally?** Yes: Capacitor Filesystem (web implementation) and disk via the dev bridge. The iOS implementation isn't run yet.
 8. **Can user-selected folders be accessed within iOS rules?** Implemented with the document picker, security-scoped access and bookmarks. **Not run.**
 9. **Are helper modules importable?** Yes (tests and UI).
-10. **Is the standard library present?** Present in the framework (2,427 files, 67 extension modules per architecture). Copying it into the app happens in the build phase, which CI checks.
+10. **Is the standard library present?** Present in the framework (2,427 files, 67 extension modules per architecture). It is present in the app: 94 of 99 checked modules imported on the iOS Simulator.
 11. **Does the package manager report compatibility honestly?** Yes, verified against live PyPI.
-12. **Can GitHub Actions build the project?** The workflows are complete and every step is implemented. They **haven't been run**. Because the native code hasn't been compiled yet, the first run may surface compile errors that need fixing.
+12. **Can GitHub Actions build the project?** Yes: Build iOS run #7 passed end to end (simulator build, self-test, unsigned device IPA).
 13. **Is code signing documented?** Yes ([SIGNING.md](SIGNING.md)), with an unsigned path, a re-signing path and a secrets-based path.
 14. **Are any build steps placeholders?** No. The signed path runs only when signing secrets exist.
 15. **Which tests were executed?** All of the above: 39 frontend tests, 68 runtime tests, 77 project checks, 27 runtime-framework checks, and the manual UI walkthrough against desktop CPython.
 16. **What remains incomplete?**
-    - First macOS build: compile the Swift and Objective-C code, run the simulator self-test, produce the IPA. Run **Build iOS**; any compile errors would show in `simulator-build.log` and `device-build.log`.
+    - Installing on a physical iPhone or iPad (needs signing; see SIGNING.md).
     - On-device testing: document picker, opened folders and iCloud, the keyboard key bar, the memory guard, Stop through `pthread_kill`, installing a signed IPA.
     - App Store submission requirements (privacy manifests for OpenSSL; see LICENSES.md).
     - Out of scope by design: a language server (no go-to-definition or type checking).
 
 ## How to extend this report
 
-After the first successful **Build iOS** run, download `ZiniaPython-build-logs` and add the contents of `selftest/simulator-selftest.json` (Python version, start-up time, cases, modules) to this file. That will be the first evidence that CPython runs inside the iOS app.
+Each **Build iOS** run publishes the self-test summary as an annotation on the run page, and the full JSON in the `ZiniaPython-build-logs` artifact (`selftest/simulator-selftest.json`). After testing on a device, add those results here.

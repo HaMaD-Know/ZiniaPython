@@ -19,14 +19,14 @@ These come from iOS itself, from CPython's iOS support, or from the design choic
 
 Present and working: everything in the self-test's module list except the modules below. That includes `json`, `math`, `pathlib`, `sqlite3`, `ssl`, `hashlib`, `zlib`/`bz2`/`lzma`/`compression.zstd`, `ctypes`, `asyncio`, `threading`, `socket`, `urllib.request`, `decimal`, `unittest`, `zoneinfo` and `xml`. The self-test (*Settings › Python runtime*) shows the real status on your device.
 
-Not available:
+Not available (measured by the self-test on the iOS 26.5 simulator: 94 of 99 checked modules import; the unavailable ones are `tkinter`, `turtle`, `curses`, `readline`, `dbm.gnu`):
 
 | Module | Reason (category) |
 | --- | --- |
-| `tkinter`, `turtle`, `idlelib`, `turtledemo` | Tk isn't part of the CPython iOS build (native extension) |
+| `tkinter`, `turtle` (`idlelib` imports but needs Tk) | Tk isn't part of the CPython iOS build (native extension) |
 | `curses`, `readline` | No terminal libraries on iOS (OS feature). The console has its own line editing. |
-| `dbm.gnu`, `dbm.ndbm` | Libraries not in the iOS build (native extension). Use `dbm.sqlite3` or `sqlite3`. |
-| `venv`, `ensurepip`, `pip` | Separate executables can't run on iOS (iOS restriction). Use the Packages screen. |
+| `dbm.gnu` | Library not in the iOS build (native extension). Use `dbm.sqlite3` or `sqlite3`. |
+| `venv`, `ensurepip`, `pip` | `venv` and `ensurepip` import, but they need separate executables, which iOS doesn't allow (iOS restriction). Use the Packages screen. |
 | `subprocess` / `multiprocessing` process creation | Modules import, but starting processes fails (iOS restriction) |
 | Modules removed in Python 3.12/3.13 (`distutils`, `imp`, `cgi`, `telnetlib`, …) | Removed from Python (PEP 594/632) |
 
