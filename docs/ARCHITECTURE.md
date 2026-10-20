@@ -9,7 +9,7 @@
 | Runtime service | `src/services/python.ts`, `runtimeMachine.ts` | Lifecycle state machine, one execution at a time, output and input routing, timeouts, interrupt. |
 | Swift plugins | `ios/App/App/ZiniaPython/ZiniaPythonPlugin.swift`, `ZiniaFilesPlugin.swift` | Argument validation, JSON requests, output batching, memory guard, document picker, folder bookmarks, coordinated file I/O. |
 | Interpreter host | `ios/App/App/ZiniaPython/ZPInterpreter.h/.m` | CPython initialisation, dedicated interpreter thread, the `_zinia_native` built-in module, interrupts, `input()` waits, HTTPS through URLSession. |
-| Runtime engine | `python/zinia/*.py` | Request handling, script execution, REPL, error description, self-test, package installer. Bundled into the app as `app/zinia`. |
+| Runtime engine | `python/zinia/*.py` | Request handling, script execution, REPL, error description, self-test, package installer. Bundled into the app as `python-app/zinia`. |
 | Build phases | `ios/App/scripts/*.sh` | Copy the runtime package into the app; copy the standard library and convert extension modules into signed frameworks (CPython iOS docs, step 7). |
 
 Registration: `SceneDelegate` creates `ZiniaBridgeViewController`, a `CAPBridgeViewController` subclass whose `capacitorDidLoad()` calls `bridge?.registerPluginInstance(...)` for both plugins. This is Capacitor's documented way to register plugins compiled into the app target. npm-installed plugins (Filesystem, Keyboard, App, Status Bar) come through Swift Package Manager (`ios/App/CapApp-SPM`).
@@ -20,7 +20,7 @@ Registration: `SceneDelegate` creates `ZiniaBridgeViewController`, a `CAPBridgeV
 
 - `PyPreConfig_InitIsolatedConfig` with `utf8_mode = 1`, then `Py_PreInitialize`.
 - `PyImport_AppendInittab("_zinia_native", …)` registers the bridge module.
-- `PyConfig_InitIsolatedConfig` with `buffered_stdio = 0`, `write_bytecode = 0`, `install_signal_handlers = 1`, `use_system_logger = 1`, `home = <App.app>/python`, and an explicit module search path: `python/lib/python3.X`, `python/lib/python3.X/lib-dynload`, `app`.
+- `PyConfig_InitIsolatedConfig` with `buffered_stdio = 0`, `write_bytecode = 0`, `install_signal_handlers = 1`, `use_system_logger = 1`, `home = <App.app>/python`, and an explicit module search path: `python/lib/python3.X`, `python/lib/python3.X/lib-dynload`, `python-app` (the docs call this folder `app`; ZiniaPython renames it because `App.app/app` would clash with the executable `App.app/App` on case-insensitive file systems).
 - `Py_InitializeFromConfig`, `import zinia.bridge`, `zinia.bridge.initialize(config_json)`, then `PyEval_SaveThread()` releases the GIL.
 
 Before touching CPython, the host checks that `Py_InitializeFromConfig` is loaded (`dlsym`) and that `os.py`, `encodings/` and `lib-dynload/` exist in the bundle. A missing piece becomes a structured error (`FRAMEWORK_MISSING`, `STDLIB_MISSING`, `SUPPORT_MISSING`) that the UI shows as a diagnostic panel. `Python.framework` is **weakly linked**, so a missing framework is reported instead of crashing at launch.

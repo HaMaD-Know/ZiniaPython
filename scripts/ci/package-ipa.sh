@@ -24,6 +24,6 @@ echo "IPA: $OUT ($(du -h "$OUT" | cut -f1))"
 echo "  Python.framework: $(test -f "$INNER/Frameworks/Python.framework/Python" && echo present || echo MISSING)"
 echo "  Standard library: $(ls -d "$INNER"/python/lib/python3.* 2>/dev/null | sed "s#$INNER/##" || echo MISSING)"
 echo "  Frameworks: $(ls -d "$INNER"/Frameworks/*.framework | wc -l | tr -d ' ')"
-echo "  Runtime package: $(test -f "$INNER/app/zinia/bridge.py" && echo present || echo MISSING)"
+echo "  Runtime package: $(test -f "$INNER/python-app/zinia/bridge.py" && echo present || echo MISSING)"
 echo "  Signature:"
 codesign -dv "$INNER" 2>&1 | grep -E 'Signature|Authority|TeamIdentifier|not signed' | sed 's/^/    /' || true

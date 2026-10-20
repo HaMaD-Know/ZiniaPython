@@ -22,7 +22,7 @@ extern NSString *const ZPErrorDomain;
 typedef NS_ENUM(NSInteger, ZPErrorCode) {
     ZPErrorCodeFrameworkMissing = 1,   // Python.framework is not loaded into the process
     ZPErrorCodeStdlibMissing = 2,      // python/lib/python3.X is missing from the bundle
-    ZPErrorCodeSupportMissing = 3,     // app/zinia (ZiniaPython's runtime package) is missing
+    ZPErrorCodeSupportMissing = 3,     // python-app/zinia (ZiniaPython's runtime package) is missing
     ZPErrorCodePreInitFailed = 4,      // Py_PreInitialize failed
     ZPErrorCodeInitFailed = 5,         // Py_InitializeFromConfig failed
     ZPErrorCodeBridgeImportFailed = 6, // "import zinia.bridge" raised

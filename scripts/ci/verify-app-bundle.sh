@@ -19,7 +19,7 @@ SO_LEFT=$(find "$APP/python" -name '*.so' 2>/dev/null | wc -l | tr -d ' ')
 [ "$SO_LEFT" = "0" ] && ok "no loose .so files remain in the bundle" || bad "$SO_LEFT .so files were not converted to frameworks"
 FWORK=$(find "$APP/python" -name '*.fwork' | wc -l | tr -d ' ')
 [ "$FWORK" -gt 40 ] && ok "$FWORK extension modules have .fwork pointers" || bad "only $FWORK .fwork files"
-[ -f "$APP/app/zinia/bridge.py" ] && ok "runtime package app/zinia present" || bad "runtime package missing"
+[ -f "$APP/python-app/zinia/bridge.py" ] && ok "runtime package python-app/zinia present" || bad "runtime package missing"
 [ -f "$APP/public/index.html" ] && ok "web UI present" || bad "web UI (public/index.html) missing"
 
 ARCHS=$(lipo -archs "$APP/Frameworks/Python.framework/Python")

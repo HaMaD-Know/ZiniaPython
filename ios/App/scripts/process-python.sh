@@ -46,7 +46,7 @@ if [ -z "${EXPANDED_CODE_SIGN_IDENTITY:-}" ]; then
     export EXPANDED_CODE_SIGN_IDENTITY_NAME="ad-hoc"
 fi
 
-PACKAGE_DIRS=(app)
+PACKAGE_DIRS=(python-app)
 if [ -d "$CODESIGNING_FOLDER_PATH/app_packages" ]; then
     PACKAGE_DIRS+=(app_packages)
 fi

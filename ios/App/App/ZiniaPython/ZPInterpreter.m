@@ -350,10 +350,10 @@ static PyStatus ZPAppendSearchPath(PyConfig *config, NSString *path) {
                         "The 'Process Python libraries' build phase did not run or failed.", self.stdlibFolderName],
                        @{ @"missingPaths": missing, @"resourcePath": resourcePath });
     }
-    NSString *bridge = [resourcePath stringByAppendingPathComponent:@"app/zinia/bridge.py"];
+    NSString *bridge = [resourcePath stringByAppendingPathComponent:@"python-app/zinia/bridge.py"];
     if (![fm fileExistsAtPath:bridge]) {
         return ZPError(ZPErrorCodeSupportMissing,
-                       @"ZiniaPython's runtime package (app/zinia) is missing from the app bundle. "
+                       @"ZiniaPython's runtime package (python-app/zinia) is missing from the app bundle. "
                        "The 'Install ZiniaPython runtime package' build phase did not run.",
                        @{ @"missingPaths": @[bridge], @"resourcePath": resourcePath });
     }
@@ -478,7 +478,7 @@ static PyStatus ZPAppendSearchPath(PyConfig *config, NSString *path) {
     NSArray<NSString *> *searchPaths = @[
         stdlib,
         [stdlib stringByAppendingPathComponent:@"lib-dynload"],
-        [resourcePath stringByAppendingPathComponent:@"app"],
+        [resourcePath stringByAppendingPathComponent:@"python-app"],
     ];
 
     _pythonTouched = YES;

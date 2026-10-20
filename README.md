@@ -82,7 +82,7 @@ A Python IDE for iPhone and iPad. You write Python in a CodeMirror 6 editor, and
    ▼
  ZPInterpreter.m ── CPython C API on one dedicated 8 MB-stack thread ("Python's main thread")
    │   Py_PreInitialize / Py_InitializeFromConfig (UTF-8 mode, unbuffered, no bytecode,
-   │   signal handlers, PYTHONHOME=<app>/python, path = stdlib, lib-dynload, app)
+   │   signal handlers, PYTHONHOME=<app>/python, path = stdlib, lib-dynload, python-app)
    ▼
  python/zinia/bridge.py ── handle(request_json) → executor / repl / selftest / packages
    │   sys.stdout/stderr → _zinia_native.emit_output → batched "output" events → console
@@ -232,7 +232,7 @@ The console shows a diagnostic panel with an error code:
 | --- | --- | --- |
 | `FRAMEWORK_MISSING` | Python.framework wasn't embedded | The *Embed Frameworks* phase failed. Check `device-build.log`. |
 | `STDLIB_MISSING` | `python/lib/python3.X` isn't in the app | The *Process Python libraries* phase didn't run. Check the log. |
-| `SUPPORT_MISSING` | `app/zinia` isn't in the app | The *Install ZiniaPython runtime package* phase didn't run. |
+| `SUPPORT_MISSING` | `python-app/zinia` isn't in the app | The *Install ZiniaPython runtime package* phase didn't run. |
 | `INIT_FAILED` / `PREINIT_FAILED` | CPython refused its configuration | The message names the failing function. |
 | `BRIDGE_IMPORT_FAILED` | `import zinia.bridge` raised | The panel shows the Python traceback. |
 | `ALREADY_FAILED` | An earlier start failed | Force-quit and reopen the app. |

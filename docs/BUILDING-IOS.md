@@ -28,7 +28,7 @@ Capacitor generated `ios/App/App.xcodeproj` (`npx cap add ios`). These additions
   1. Sources
   2. Frameworks
   3. Resources (the web UI in `public/`)
-  4. *Install ZiniaPython runtime package*, which runs `ios/App/scripts/install-zinia-runtime.sh`: copies `python/zinia` into `App.app/app/zinia`, plus `python-runtime/app_packages/<platform>` when present.
+  4. *Install ZiniaPython runtime package*, which runs `ios/App/scripts/install-zinia-runtime.sh`: copies `python/zinia` into `App.app/python-app/zinia`, plus `python-runtime/app_packages/<platform>` when present.
   5. *Process Python libraries*, which runs `ios/App/scripts/process-python.sh`: the guide's step 7. It sources the framework's helper (`build/build_utils.sh`, or `build/utils.sh` in the pinned BeeWare package), copies the platform's standard library into `App.app/python/lib`, and converts every `.so` into `Frameworks/<module>.framework` with a `.fwork` pointer. Unsigned builds use an ad-hoc signature for these frameworks.
   6. Embed Frameworks
 
