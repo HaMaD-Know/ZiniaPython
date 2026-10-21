@@ -70,6 +70,10 @@ While a script runs, the plugin polls `os_proc_available_memory()` every 0.5 s a
 - **Python and opened folders:** while a folder is open, its security-scoped access lets Python read and write it too, so projects can run from iCloud Drive. The native plugins accept working directories and project roots only inside the workspace, an opened folder, or the app's temporary directory.
 - **Path safety:** native and web code reject absolute paths, `..` segments and NUL characters in root-relative paths. Deleting a root is refused.
 
+## Starting other Python programs
+
+iOS has no `fork`/`exec` for apps (`subprocess.Popen` raises `OSError: ios does not support processes`, and `os.system` does not exist). At start-up, `zinia.launcher.install()` replaces `subprocess.Popen` and adds `os.system`, but only where processes are unavailable (and in the desktop development bridge, to behave like the device). A command whose program is Python (`python`, `python3`, `python3.N`, `sys.executable`) is parsed (script, `-m`, `-c`, ignorable flags such as `-u`) and run with `runpy` as `__main__` in the calling thread. Its own `sys.argv`, working directory (`cwd=`), environment (`env=`) and stdin/stdout/stderr (console, `PIPE`, `DEVNULL`, file objects, `input=`) are set for the run and restored afterwards. It returns the exit code from `sys.exit()`, or 1 with the traceback on stderr after an uncaught exception. User modules the program imported are forgotten afterwards, as if its process had ended. Nesting is limited to 16 levels. `KeyboardInterrupt` (Stop) propagates to the caller.
+
 ## Packages
 
 See [PACKAGES.md](PACKAGES.md). In short: `python/zinia/packages.py` uses PyPI's JSON API through `URLSession` (the iOS trust store). It installs only pure-Python wheels, verifies SHA-256, unpacks into `Application Support/ZiniaPython/site-packages` with path-traversal checks, records a `RECORD` file, and uninstalls exactly those files.

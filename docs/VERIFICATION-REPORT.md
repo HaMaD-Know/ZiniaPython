@@ -53,7 +53,7 @@ Problems found and fixed on the way to this run (runs 1–6): a desktop test tha
 | 1 | `npm run lint` | passed | ESLint, no errors |
 | 2 | `npm run typecheck` | passed | TypeScript 6.0.3, strict mode |
 | 3 | `npm test` | **57 / 57 passed** (8 files) | Frontend logic, including the graphics preview; see the details below |
-| 4 | `python -I python/tests/run_tests.py` | **97 passed, 2 skipped** (99 tests) | Runtime engine and graphics modules on real CPython 3.12 |
+| 4 | `python -I python/tests/run_tests.py` | **109 passed, 2 skipped** (111 tests) | Runtime engine and graphics modules on real CPython 3.12 |
 | 5 | same with `ZINIA_NETWORK_TESTS=1` | **68 / 68 passed** | Including live PyPI analysis (six installable; numpy native-only) |
 | 6 | `npm run check:ios` | **77 / 77 checks passed** | Xcode project wiring (below) |
 | 7 | `scripts/fetch-python-runtime.ps1` | passed | Download + SHA-256 `157a6b95…e0a3` verified + extraction on Windows |
@@ -104,6 +104,15 @@ Found and fixed during this walkthrough: `set_background()` before the first fra
 | Vitest: a pointer's move is never merged across its release or tap | passed | jsdom |
 | Browser drag, desktop bridge, canvas scaled 800 → 355 CSS px at device pixel ratio 1.41: `13_drag_circles.py` kept running after its last line; dragging the cyan circle from canvas (200, 200) landed it at the predicted (498, 448) (pixel read-back); release removed the held outline; touching empty space did nothing and raised no error; the other circles never moved; Stop, then Run again, started fresh and dragging still worked; Stop prints just `KeyboardInterrupt` | passed | mouse in a Chromium-based browser pane |
 | Fingers on an iPhone or iPad | **not run** | no device available |
+
+### Starting other Python programs from a script (2026-10-21)
+
+| Check | Result | Where it ran |
+| --- | --- | --- |
+| 12 tests in `python/tests/test_launcher.py`, launcher forced on as on iOS: arguments, `input=` and captured output with exit code 3; console output when not captured; `os.system` (wait status) and `os.popen`; `python`/`python3`/`python3.14`/`sys.executable`/full path, `-m`, bytes output; shell strings and `Popen.communicate`; a crash gives exit code 1 with a traceback starting at the crashed file; a missing file gives 2; `check_call` raises; `ls` and `pip` explain the iOS limit; the caller's argv, cwd, `sys.path`, environment and `__main__` are restored; modules the program imported are fresh next time; runaway self-starting stops at 16 levels; Stop stops the caller | passed | desktop CPython 3.12 |
+| Self-test case "Start another Python program (subprocess)" | passes on desktop | iOS: next CI simulator self-test |
+| In the app through the desktop bridge (launcher on, as on iOS): a project `main.py` started `step1.py` with an argument, ran `step2.py` with input and got its output and exit code 5, then used `os.system`; all output appeared in order in the console | passed | browser pane, desktop CPython |
+| On an iPhone or iPad | **not run** | no device available |
 
 Frame rates above were measured with the browser pane in the foreground. When the pane was in the background the browser throttled `requestAnimationFrame` and the measured rate fell to 2 frames/s (the 0.5 s acknowledgement timeout), as designed.
 

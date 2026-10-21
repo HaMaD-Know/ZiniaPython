@@ -20,7 +20,7 @@ import site
 import sys
 import time
 
-from . import PROTOCOL_VERSION, __version__, errors, executor, native, packages, repl, selftest, streams
+from . import PROTOCOL_VERSION, __version__, errors, executor, launcher, native, packages, repl, selftest, streams
 
 
 class BridgeError(Exception):
@@ -119,6 +119,8 @@ def initialize(config_json: str) -> str:
         _State.output_limit = int(config.get("outputLimit") or streams.DEFAULT_OUTPUT_LIMIT)
         if config.get("installStreams", True):
             streams.install()
+        # iOS cannot start processes: run `python other.py` style subprocesses in-process.
+        launcher.install(force=bool(config.get("inProcessSubprocess")))
         site_dir = config.get("sitePackages")
         bundled = [d for d in (config.get("appPackages"),) if d]
         if site_dir:

@@ -62,6 +62,11 @@ SCRIPT_CASES = [
      "box = scene.add_box(width=2, height=2, depth=2, color='#00ffff')\nbox.rotate(0, 0.5, 0)\n"
      "scene.add_light('ambient', intensity=0.7)\nscene.set_camera(position=(6, 5, 8))\nscene.show()\n"
      "print(gfx.size(), len(scene.objects()))\n", "(200, 100) 2\n"),
+    ("run-other-program", "Start another Python program (subprocess)",
+     "import subprocess, sys\n"
+     "r = subprocess.run([sys.executable, '-c', 'import sys; print(input(), sys.argv[1:]); sys.exit(3)', 'x'],\n"
+     "                   input='child', capture_output=True, text=True)\n"
+     "print(r.stdout.strip(), r.returncode)\n", "child ['x'] 3\n"),
 ]
 
 

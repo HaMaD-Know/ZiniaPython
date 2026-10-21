@@ -84,8 +84,9 @@ _NATIVE_THIRD_PARTY = {
 
 # Modules that import successfully but have documented functional limits.
 LIMITED = {
-    "subprocess": "Importable, but iOS does not allow apps to start subprocesses; "
-                  "subprocess.run() and Popen raise an error.",
+    "subprocess": "iOS does not allow apps to start processes. Python programs started with "
+                  "subprocess (python file.py, sys.executable, -m, -c) and os.system run inside the "
+                  "app, one after another; other commands raise an error.",
     "multiprocessing": "Importable, but iOS does not allow apps to start subprocesses, so worker "
                        "processes cannot be created. Use threading or concurrent.futures.ThreadPoolExecutor.",
     "webbrowser": "Opens URLs through iOS, outside ZiniaPython.",

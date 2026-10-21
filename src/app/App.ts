@@ -908,7 +908,9 @@ export class ZiniaApp {
       if (t.untitled) return false;
       if (t.id === tab.id) return true;
       const p = projectOf(t.ref);
-      return !!project && !!p && projectKey(p) === projectKey(project);
+      if (project) return !!p && projectKey(p) === projectKey(project);
+      // No project: files next to the one being run may be imported or started by it.
+      return t.ref.root === tab.ref.root && dirname(t.ref.path) === dirname(tab.ref.path);
     });
     for (const t of targets) {
       if (!(await this.saveTab(t, { quiet: true }))) return false;

@@ -177,6 +177,7 @@ def handle(method, options):
             started = time.perf_counter()
             reply = json.loads(bridge.initialize(json.dumps({
                 "workspaceRoot": WORKSPACE, "sitePackages": SITE, "userRoots": [WORKSPACE], "installStreams": True,
+                "inProcessSubprocess": True,  # behave like iOS, which cannot start processes
             })))
             if not reply["ok"]:
                 raise RuntimeError(reply["error"].get("message", "initialize failed"))
