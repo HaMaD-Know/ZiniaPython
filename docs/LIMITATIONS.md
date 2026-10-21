@@ -19,7 +19,7 @@ These come from iOS itself, from CPython's iOS support, or from the design choic
 
 - **No `tkinter` or `turtle`.** Use `zinia_draw` and `zinia_3d` instead ([GRAPHICS.md](GRAPHICS.md)).
 - **Frame rate depends on the program.** Every frame crosses from Python to the web view and back. The preview shows the measured rate; nothing guarantees 60 frames per second.
-- **Touch and key events reach Python only while `run_animation()` runs.**
+- **Touch and key events reach Python only while the program runs** (`run_animation()`, `listen()`, or automatically after the last line when `on_touch()`/`on_key()` is set). A dragged shape trails the finger by a frame or two.
 - **No images, textures, sprites, shadows or 3D model files (GLB/GLTF).**
 - **3D needs WebGL.** If it is unavailable, the 3D preview says so; 2D still works.
 

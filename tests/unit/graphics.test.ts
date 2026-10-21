@@ -168,6 +168,24 @@ describe('GraphicsController', () => {
     ]);
   });
 
+  it('never merges a move across the release of that finger', () => {
+    const { h } = host();
+    const post = vi.fn().mockResolvedValue({});
+    const frame = { run: () => {} };
+    const c = new GraphicsController(h, post, (cb) => (frame.run = cb));
+    c.beginRun('run-1');
+    c.pushEvent({ type: 'down', x: 0, y: 0, id: 1, surface: '2d' });
+    c.pushEvent({ type: 'move', x: 5, y: 5, id: 1, surface: '2d' });
+    c.pushEvent({ type: 'move', x: 9, y: 9, id: 2, surface: '2d' });
+    c.pushEvent({ type: 'move', x: 6, y: 6, id: 1, surface: '2d' });
+    c.pushEvent({ type: 'up', x: 6, y: 6, id: 1, surface: '2d' });
+    c.pushEvent({ type: 'tap', x: 6, y: 6, id: 1, surface: '2d' });
+    c.pushEvent({ type: 'move', x: 7, y: 7, id: 1, surface: '2d' });
+    frame.run();
+    const events = JSON.parse(post.mock.calls[0][1]) as { type: string; x: number; id: number }[];
+    expect(events.map((e) => `${e.type}${e.id}@${e.x}`)).toEqual(['down1@0', 'move1@6', 'move2@9', 'up1@6', 'tap1@6', 'move1@7']);
+  });
+
   it('sends nothing after the run ended', () => {
     const { h } = host();
     const post = vi.fn().mockResolvedValue({});
@@ -257,9 +275,9 @@ describe('SceneModel (3D without WebGL)', () => {
 });
 
 describe('bundled examples', () => {
-  it('includes the twelve programs and the README', () => {
+  it('includes the thirteen programs and the README', () => {
     const names = Object.keys(GRAPHICS_EXAMPLES);
-    expect(names.filter((n) => n.endsWith('.py'))).toHaveLength(12);
+    expect(names.filter((n) => n.endsWith('.py'))).toHaveLength(13);
     expect(names).toContain('README.md');
     expect(GRAPHICS_EXAMPLES['07_rotating_cube.py']).toContain('import zinia_3d');
   });

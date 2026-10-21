@@ -253,6 +253,7 @@ def run_script(req: RunRequest, *, user_roots=()) -> dict:
             else:
                 try:
                     exec(code_obj, main.__dict__)
+                    graphics.keep_alive()  # touch handlers but no loop: listen until Stop
                 except SystemExit as exc:
                     exit_code = _system_exit(exc, sink)
                     status = "ok" if exit_code == 0 else "exit"

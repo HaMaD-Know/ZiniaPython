@@ -52,8 +52,8 @@ Problems found and fixed on the way to this run (runs 1–6): a desktop test tha
 | --- | --- | --- | --- |
 | 1 | `npm run lint` | passed | ESLint, no errors |
 | 2 | `npm run typecheck` | passed | TypeScript 6.0.3, strict mode |
-| 3 | `npm test` | **56 / 56 passed** (8 files) | Frontend logic, including the graphics preview; see the details below |
-| 4 | `python -I python/tests/run_tests.py` | **85 passed, 2 skipped** (87 tests) | Runtime engine and graphics modules on real CPython 3.12 |
+| 3 | `npm test` | **57 / 57 passed** (8 files) | Frontend logic, including the graphics preview; see the details below |
+| 4 | `python -I python/tests/run_tests.py` | **97 passed, 2 skipped** (99 tests) | Runtime engine and graphics modules on real CPython 3.12 |
 | 5 | same with `ZINIA_NETWORK_TESTS=1` | **68 / 68 passed** | Including live PyPI analysis (six installable; numpy native-only) |
 | 6 | `npm run check:ios` | **77 / 77 checks passed** | Xcode project wiring (below) |
 | 7 | `scripts/fetch-python-runtime.ps1` | passed | Download + SHA-256 `157a6b95…e0a3` verified + extraction on Windows |
@@ -95,6 +95,15 @@ Browser walkthrough through `npm run dev:bridge`:
 - REPL: `create_canvas`, `set_background('white')`, a red circle → canvas pixels read back as white at the corner and red in the centre.
 
 Found and fixed during this walkthrough: `set_background()` before the first frame did not repaint (it now fills the canvas); validation errors pointed into `zinia_draw.py` (they now point at the user's line); events of the other surface could reach the wrong handler (they are now filtered by surface).
+
+### Touch: `zinia_draw.on_touch` (2026-10-21)
+
+| Check | Result | Where it ran |
+| --- | --- | --- |
+| 12 Python tests: `on_touch` exists and rejects non-functions; exact event format (start/move/end/tap, `dx`/`dy`, start position, finger count, cancelled, pointer type); hover and unknown fingers are not touch events; a program that only sets `on_touch` keeps listening; no second loop after `run_animation`; `stop_animation` ends `listen`; `listen` needs a handler; registering again replaces; three runs give identical events (no duplicates); handler errors point at the handler line; the drag example moves only the touched circle, ignores empty space, handles two fingers and clamps to the canvas | passed | desktop CPython 3.12 |
+| Vitest: a pointer's move is never merged across its release or tap | passed | jsdom |
+| Browser drag, desktop bridge, canvas scaled 800 → 355 CSS px at device pixel ratio 1.41: `13_drag_circles.py` kept running after its last line; dragging the cyan circle from canvas (200, 200) landed it at the predicted (498, 448) (pixel read-back); release removed the held outline; touching empty space did nothing and raised no error; the other circles never moved; Stop, then Run again, started fresh and dragging still worked; Stop prints just `KeyboardInterrupt` | passed | mouse in a Chromium-based browser pane |
+| Fingers on an iPhone or iPad | **not run** | no device available |
 
 Frame rates above were measured with the browser pane in the foreground. When the pane was in the background the browser throttled `requestAnimationFrame` and the measured rate fell to 2 frames/s (the 0.5 s acknowledgement timeout), as designed.
 

@@ -55,6 +55,7 @@ export class GraphicsPanel implements GraphicsHost {
   private fpsWindowStart = performance.now();
   private fps = 0;
   private pointers = new Map<number, { x: number; y: number; t: number; moved: boolean }>();
+  private touches2d = new Map<number, { x: number; y: number; t: number; moved: boolean }>();
 
   constructor(private actions: GraphicsPanelActions) {
     this.canvas2d = h('canvas', { class: 'gfx-canvas', attrs: { 'aria-label': '2D graphics output' } });
@@ -189,6 +190,8 @@ export class GraphicsPanel implements GraphicsHost {
   }
 
   reset(): void {
+    this.touches2d.clear();
+    this.pointers.clear();
     this.drawn = { '2d': false, '3d': false };
     this.pending3d.forEach((p) => p.rendered());
     this.pending3d = [];
@@ -364,21 +367,38 @@ export class GraphicsPanel implements GraphicsHost {
   private attach2DInput(): void {
     const canvas = this.canvas2d;
     canvas.style.touchAction = 'none';
-    const handler = (type: 'down' | 'move' | 'up') => (e: PointerEvent) => {
+    // Attached once for the lifetime of the panel; a new run or canvas only
+    // resets the per-finger state below, so listeners never pile up.
+    const handler = (type: 'down' | 'move' | 'up' | 'cancel') => (e: PointerEvent) => {
       if (!this.renderer2d) return;
       if (type === 'down') {
+        // Keep receiving this finger's moves and release even outside the canvas.
         canvas.setPointerCapture?.(e.pointerId);
         this.stage2d.focus({ preventScroll: true });
+        this.touches2d.set(e.pointerId, { x: e.clientX, y: e.clientY, t: performance.now(), moved: false });
       }
-      if (type === 'move' && e.pointerType !== 'mouse' && e.buttons === 0) return;
+      const start = this.touches2d.get(e.pointerId);
+      if (type === 'move') {
+        if (e.pointerType !== 'mouse' && !start) return;
+        if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > TAP_MAX_MOVE) start.moved = true;
+      }
+      // Client pixels -> canvas coordinates: undoes the fit-to-panel scaling;
+      // the device pixel ratio only affects the backing store, not these units.
       const p = this.renderer2d.toCanvas(e.clientX, e.clientY);
-      this.send({ type, x: p.x, y: p.y, id: e.pointerId, buttons: e.buttons }, '2d');
+      const base = { x: p.x, y: p.y, id: e.pointerId, buttons: e.buttons, pointerType: e.pointerType || 'touch' };
+      this.send({ type, ...base }, '2d');
+      if (type === 'up' || type === 'cancel') {
+        this.touches2d.delete(e.pointerId);
+        if (type === 'up' && start && !start.moved && performance.now() - start.t < TAP_MAX_MS) {
+          this.send({ type: 'tap', ...base }, '2d');
+        }
+      }
       if (type !== 'move') e.preventDefault();
     };
     canvas.addEventListener('pointerdown', handler('down'));
     canvas.addEventListener('pointermove', handler('move'));
     canvas.addEventListener('pointerup', handler('up'));
-    canvas.addEventListener('pointercancel', handler('up'));
+    canvas.addEventListener('pointercancel', handler('cancel'));
   }
 
   private attach3DInput(renderer: Scene3DRenderer): void {

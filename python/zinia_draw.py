@@ -33,11 +33,26 @@ Animation::
     gfx.run_animation()        # returns when stop_animation() is called,
                                # the Stop button is pressed, or duration ends
 
-Touch and keyboard (delivered while run_animation() runs)::
+Touch (fingers, Apple Pencil, mouse)::
 
-    def on_pointer(event):     # event.type: "down", "move" or "up"
-        print(event.x, event.y, event.id)   # canvas coordinates; id per finger
-    gfx.on_pointer(on_pointer)
+    def on_touch(event):       # event.type: "start", "move", "end" or "tap"
+        print(event.type, event.x, event.y)  # canvas coordinates, like circle()
+    gfx.on_touch(on_touch)
+
+    event.id         which finger (several fingers can touch at once)
+    event.x, event.y position in canvas coordinates (any scaling is undone)
+    event.dx, event.dy   movement since this finger's previous event
+    event.start_x, event.start_y  where this finger first touched
+    event.touches    how many fingers are down now
+    event.cancelled  True on an "end" that iOS cancelled (e.g. a system gesture)
+    event.pointer_type   "touch", "pen" or "mouse"
+
+"move" only happens while a finger is down; "tap" follows the "end" of a
+short touch that hardly moved. Handlers run on Python's thread between
+frames. If the program ends with a handler set and no run_animation(), it
+keeps listening for touches until you press Stop (listen() does this
+explicitly). ``on_pointer`` is the lower-level variant: "down", "move" (also
+mouse hover) and "up".
 
     def on_key(event):         # event.type: "down" or "up"; event.key: e.g. "ArrowLeft", "a", " "
         ...
@@ -50,8 +65,8 @@ from zinia import graphics as _g
 
 __all__ = [
     "create_canvas", "set_background", "clear", "circle", "ellipse", "rectangle", "line", "polyline",
-    "polygon", "text", "show", "size", "set_update", "run_animation", "stop_animation", "on_pointer",
-    "on_key", "pointer", "frame_rate",
+    "polygon", "text", "show", "size", "set_update", "run_animation", "stop_animation", "on_touch", "listen",
+    "on_pointer", "on_key", "pointer", "frame_rate",
 ]
 
 _MAX_CANVAS = 4096
@@ -63,24 +78,62 @@ class _State:
     height = 600
     created = False
     pointer_handler = None
+    touch_handler = None
     key_handler = None
     pointer = (0.0, 0.0, False)
+    touches: dict = {}  # finger id -> {"start": (x, y), "last": (x, y)}
+
+
+def _touch(kind: str, x: float, y: float, finger, raw: dict, **extra) -> None:
+    if _State.touch_handler is None:
+        return
+    info = _State.touches.get(finger)
+    start = info["start"] if info else (x, y)
+    last = info["last"] if info else (x, y)
+    if info is not None:
+        info["last"] = (x, y)
+    _State.touch_handler(_g.make_event({
+        "type": kind, "x": x, "y": y, "id": finger,
+        "dx": x - last[0], "dy": y - last[1], "start_x": start[0], "start_y": start[1],
+        # fingers still down (an ending finger no longer counts)
+        "touches": len(_State.touches) - (1 if kind == "end" and info is not None else 0), "cancelled": False,
+        "pointer_type": raw.get("pointerType", "touch"), **extra}))
 
 
 def _dispatch(event: dict) -> None:
     kind = event.get("type")
-    if kind in ("down", "move", "up"):
+    if kind in ("down", "move", "up", "cancel", "tap"):
         x = float(event.get("x", 0))
         y = float(event.get("y", 0))
-        down = kind != "up" and (kind == "down" or bool(event.get("buttons", _State.pointer[2])))
+        finger = event.get("id", 0)
+        if kind == "tap":
+            _touch("tap", x, y, finger, event)
+            return
+        ended = kind in ("up", "cancel")
+        down = not ended and (kind == "down" or bool(event.get("buttons", _State.pointer[2])))
         _State.pointer = (x, y, down)
         if _State.pointer_handler is not None:
-            _State.pointer_handler(_g.make_event({**event, "x": x, "y": y}))
+            _State.pointer_handler(_g.make_event({**event, "type": "up" if ended else kind, "x": x, "y": y}))
+        if kind == "down":
+            _State.touches[finger] = {"start": (x, y), "last": (x, y)}
+            _touch("start", x, y, finger, event)
+        elif finger in _State.touches:  # moves and ends of fingers that started on the canvas
+            if ended:
+                try:
+                    _touch("end", x, y, finger, event, cancelled=kind == "cancel")
+                finally:
+                    _State.touches.pop(finger, None)
+            else:
+                _touch("move", x, y, finger, event)
     elif kind in ("keydown", "keyup") and _State.key_handler is not None:
         _State.key_handler(_g.make_event({**event, "type": kind[3:]}))
 
 
-_animation = _g.Animation(_surface, _dispatch)
+def _wants_input() -> bool:
+    return any(h is not None for h in (_State.touch_handler, _State.pointer_handler, _State.key_handler))
+
+
+_animation = _g.Animation(_surface, _dispatch, _wants_input)
 
 
 def _reset() -> None:
@@ -89,8 +142,10 @@ def _reset() -> None:
     _State.width, _State.height = 800, 600
     _State.created = False
     _State.pointer_handler = None
+    _State.touch_handler = None
     _State.key_handler = None
     _State.pointer = (0.0, 0.0, False)
+    _State.touches = {}
 
 
 def _ensure_canvas() -> None:
@@ -239,6 +294,30 @@ def on_pointer(function) -> None:
     if function is not None and not callable(function):
         raise TypeError("on_pointer() needs a function that takes one argument: event")
     _State.pointer_handler = function
+
+
+def on_touch(function) -> None:
+    """Register on_touch(event) for fingers, Apple Pencil and mouse (see module docs).
+
+    Calling it again replaces the previous function (it never adds a second
+    listener); on_touch(None) removes it.
+    """
+    if function is not None and not callable(function):
+        raise TypeError("on_touch() needs a function that takes one argument: event")
+    _State.touch_handler = function
+
+
+def listen() -> None:
+    """Keep delivering touch and key events until Stop or stop_animation().
+
+    Use it instead of run_animation() when the picture only changes in
+    response to touches. A program that sets on_touch() and simply ends
+    does the same automatically.
+    """
+    _ensure_canvas()
+    if not _wants_input():
+        raise RuntimeError("Call on_touch(), on_pointer() or on_key() before listen().")
+    _g.listen([_animation])
 
 
 def on_key(function) -> None:

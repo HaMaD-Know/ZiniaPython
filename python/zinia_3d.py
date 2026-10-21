@@ -240,7 +240,11 @@ def _dispatch(event: dict) -> None:
         _State.key_handler(_g.make_event({**event, "type": kind[3:]}))
 
 
-_animation = _g.Animation(_surface, _dispatch)
+def _wants_input() -> bool:
+    return any(h is not None for h in (_State.tap_handler, _State.pointer_handler, _State.key_handler))
+
+
+_animation = _g.Animation(_surface, _dispatch, _wants_input)
 
 
 def _reset() -> None:

@@ -42,6 +42,9 @@ recorded: list[dict] = []
 _injected: list[dict] = []
 _reset_hooks: list = []
 _flush_hooks: list = []
+_animations: list = []    # one Animation per surface, for keep_alive()
+#: How long listen() waits for input before checking Stop again (seconds).
+LISTEN_POLL = 0.25
 
 
 # ---------------------------------------------------------------------------
@@ -233,17 +236,21 @@ def make_event(raw: dict) -> SimpleNamespace:
 class Animation:
     """Frame loop shared by both modules. One per surface."""
 
-    def __init__(self, surface: Surface, dispatch):
+    def __init__(self, surface: Surface, dispatch, wants_input=None):
         self.surface = surface
         self.dispatch = dispatch      # callable(event dict) for pointer/key/tap events
+        self.wants_input = wants_input or (lambda: False)  # True while an input handler is set
         self.update = None
         self.running = False
+        self.used = False             # run_animation() or listen() ran during this program
         self.frames = 0
         self.measured_fps = 0.0
+        _animations.append(self)
 
     def reset(self) -> None:
         self.update = None
         self.running = False
+        self.used = False
         self.frames = 0
 
     def stop(self) -> None:
@@ -260,6 +267,7 @@ class Animation:
         interval = 1.0 / fps
         live = native.AVAILABLE
         self.running = True
+        self.used = True
         self.frames = 0
         started = last = time.perf_counter()
         awaiting = [None]  # batch number whose "frame drawn" acknowledgement is pending
@@ -306,3 +314,53 @@ class Animation:
                     handle(poll_events(max(0.0, wait)))
         finally:
             self.running = False
+
+
+# ---------------------------------------------------------------------------
+# input without animation
+# ---------------------------------------------------------------------------
+
+def listen(animations) -> None:
+    """Deliver touch/key events to the handlers until Stop or stop_animation().
+
+    Handlers usually redraw; whatever they draw is sent after each batch of
+    events, so the preview follows the finger without an animation loop.
+    Without a native host (desktop tests) the injected events are handled
+    once and listen() returns.
+    """
+    animations = list(animations)
+    by_surface = {a.surface.name: a for a in animations}
+    live = native.AVAILABLE
+    for a in animations:
+        a.used = True
+        a.running = True
+        a.surface.flush()  # show the first picture before waiting for a touch
+    try:
+        while any(a.running for a in animations):
+            for event in poll_events(LISTEN_POLL if live else 0):
+                if event.get("type") == "ack":
+                    continue  # nothing waits for frames here
+                target = by_surface.get(event.get("surface"))
+                if target is None and "surface" not in event and len(animations) == 1:
+                    target = animations[0]
+                if target is not None and target.running:
+                    target.dispatch(event)
+            for a in animations:
+                a.surface.flush()
+            if not live:
+                break
+    finally:
+        for a in animations:
+            a.running = False
+
+
+def keep_alive() -> None:
+    """Called after the script's last line (zinia.executor).
+
+    A program that registered a touch, pointer, tap or key handler but never
+    ran run_animation() or listen() would otherwise end before the first
+    touch. Like turtle.done(), keep it running and listening until Stop.
+    """
+    waiting = [a for a in _animations if not a.used and a.wants_input()]
+    if waiting:
+        listen(waiting)

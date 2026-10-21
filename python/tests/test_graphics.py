@@ -224,10 +224,145 @@ class SceneTests(GraphicsTestCase):
         self.assertEqual(r["stdout"], "[(True, (0, 0.5, 0)), (False, None)]\n")
 
 
+def touch(kind, x, y, finger=1, **extra):
+    return {"type": kind, "x": x, "y": y, "id": finger, "surface": "2d", "pointerType": "touch", **extra}
+
+
+def inject(events):
+    """Source line that queues events as if the preview had posted them."""
+    return f"from zinia import graphics as _zg\n_zg.inject_events({events!r})\n"
+
+
+class TouchTests(GraphicsTestCase):
+    def test_on_touch_exists_and_validates(self):
+        r = self.run_code("import zinia_draw as gfx\nprint(callable(gfx.on_touch), 'on_touch' in gfx.__all__)\n"
+                          "gfx.on_touch(42)\n")
+        self.assertEqual(r["stdout"], "True True\n")
+        self.assertEqual(r["error"]["type"], "TypeError")
+        self.assertEqual(r["error"]["location"]["lineno"], 3)
+
+    def test_event_format(self):
+        events = [touch("down", 100, 200), touch("move", 110, 195), touch("move", 130, 190),
+                  touch("up", 130, 190), touch("tap", 5, 6, finger=2),
+                  touch("down", 1, 1, finger=3), touch("cancel", 2, 2, finger=3)]
+        code = ("import zinia_draw as gfx\nseen = []\n"
+                "gfx.on_touch(lambda e: seen.append((e.type, e.x, e.y, e.id, e.dx, e.dy, e.start_x, e.start_y,"
+                " e.touches, e.cancelled, e.pointer_type)))\n" + inject(events) +
+                "gfx.listen()\nfor s in seen:\n    print(s)\n")
+        r = self.run_code(code)
+        self.assertEqual(r["status"], "ok", r["error"])
+        self.assertEqual(r["stdout"].splitlines(), [
+            "('start', 100.0, 200.0, 1, 0.0, 0.0, 100.0, 200.0, 1, False, 'touch')",
+            "('move', 110.0, 195.0, 1, 10.0, -5.0, 100.0, 200.0, 1, False, 'touch')",
+            "('move', 130.0, 190.0, 1, 20.0, -5.0, 100.0, 200.0, 1, False, 'touch')",
+            "('end', 130.0, 190.0, 1, 0.0, 0.0, 100.0, 200.0, 0, False, 'touch')",
+            "('tap', 5.0, 6.0, 2, 0.0, 0.0, 5.0, 6.0, 0, False, 'touch')",
+            "('start', 1.0, 1.0, 3, 0.0, 0.0, 1.0, 1.0, 1, False, 'touch')",
+            "('end', 2.0, 2.0, 3, 1.0, 1.0, 1.0, 1.0, 0, True, 'touch')",
+        ])
+
+    def test_moves_without_a_touch_are_not_touch_events(self):
+        # mouse hover, or a finger that went down before this run started
+        events = [touch("move", 5, 5, pointerType="mouse"), touch("move", 6, 6, finger=9), touch("up", 6, 6, finger=9)]
+        r = self.run_code("import zinia_draw as gfx\nt, p = [], []\ngfx.on_touch(lambda e: t.append(e.type))\n"
+                          "gfx.on_pointer(lambda e: p.append(e.type))\n" + inject(events) + "gfx.listen()\nprint(t, p)\n")
+        self.assertEqual(r["stdout"], "[] ['move', 'move', 'up']\n")
+
+    def test_program_that_only_sets_on_touch_keeps_listening(self):
+        # The user's pattern: draw, register on_touch, and the script ends.
+        code = (
+            "import zinia_draw as gfx\n"
+            "gfx.create_canvas(800, 600)\n"
+            "objects = [{'x': 200, 'y': 200, 'radius': 45}]\n"
+            "def draw():\n"
+            "    gfx.clear()\n"
+            "    for obj in objects:\n"
+            "        gfx.circle(obj['x'], obj['y'], obj['radius'], color='#00ffff')\n"
+            "def on_touch(event):\n"
+            "    if event.type == 'move':\n"
+            "        objects[0]['x'], objects[0]['y'] = event.x, event.y\n"
+            "        draw()\n"
+            "draw()\n"
+            "gfx.on_touch(on_touch)\n"
+            + inject([touch("down", 200, 200), touch("move", 300, 250), touch("up", 300, 250)])
+        )
+        r = self.run_code(code)
+        self.assertEqual(r["status"], "ok", r["error"])
+        circles = [c for c in self.commands("2d") if c[0] == "circle"]
+        self.assertEqual(circles[0][1:3], [200.0, 200.0])
+        self.assertEqual(circles[-1][1:3], [300.0, 250.0])
+
+    def test_no_extra_listening_after_run_animation(self):
+        graphics.headless_frame_limit = 1
+        r = self.run_code("import zinia_draw as gfx\nn = []\ngfx.on_touch(lambda e: n.append(e))\n"
+                          "gfx.set_update(lambda dt: None)\ngfx.run_animation()\n"
+                          + inject([touch("down", 1, 1)]) + "print('after')\n")
+        self.assertEqual(r["status"], "ok", r["error"])
+        self.assertEqual(r["stdout"], "after\n")  # the late event was not delivered by a second loop
+
+    def test_stop_animation_ends_listen(self):
+        events = [touch("down", 1, 1), touch("up", 1, 1), touch("down", 2, 2)]
+        r = self.run_code("import zinia_draw as gfx\nseen = []\n"
+                          "def on_touch(e):\n    seen.append(e.type)\n    if e.type == 'end':\n        gfx.stop_animation()\n"
+                          "gfx.on_touch(on_touch)\n" + inject(events) + "gfx.listen()\nprint(seen)\n")
+        self.assertEqual(r["stdout"], "['start', 'end']\n")
+
+    def test_listen_needs_a_handler(self):
+        r = self.run_code("import zinia_draw as gfx\ngfx.listen()\n")
+        self.assertEqual(r["error"]["type"], "RuntimeError")
+
+    def test_registering_again_replaces_the_handler(self):
+        r = self.run_code("import zinia_draw as gfx\na, b = [], []\ngfx.on_touch(lambda e: a.append(1))\n"
+                          "gfx.on_touch(lambda e: b.append(1))\n" + inject([touch("down", 1, 1)])
+                          + "gfx.listen()\nprint(len(a), len(b))\n")
+        self.assertEqual(r["stdout"], "0 1\n")
+
+    def test_running_again_does_not_duplicate_events(self):
+        code = ("import zinia_draw as gfx\ncount = []\ngfx.on_touch(lambda e: count.append(e.type))\n"
+                + inject([touch("down", 1, 1), touch("up", 1, 1)]) + "gfx.listen()\nprint(count)\n")
+        for _ in range(3):
+            r = self.run_code(code)
+            self.assertEqual(r["stdout"], "['start', 'end']\n")
+
+    def test_handler_errors_point_at_the_handler(self):
+        code = ("import zinia_draw as gfx\n"
+                "def on_touch(e):\n"
+                "    return 1 / 0\n"
+                "gfx.on_touch(on_touch)\n" + inject([touch("down", 1, 1)]))
+        r = self.run_code(code)
+        self.assertEqual(r["status"], "error")
+        self.assertEqual(r["error"]["type"], "ZeroDivisionError")
+        self.assertEqual(r["error"]["location"]["lineno"], 3)
+
+    def _drag_example(self, events):
+        with open(os.path.join(EXAMPLES, "13_drag_circles.py"), encoding="utf-8") as fh:
+            source = fh.read()
+        source += "\n" + inject(events) + "_zg.keep_alive()\nprint([(o['color'], o['x'], o['y']) for o in objects])\n"
+        r = self.run_code(source, filename="13_drag_circles.py")
+        self.assertEqual(r["status"], "ok", r["error"] and r["error"]["traceback"])
+        return dict((c, (x, y)) for c, x, y in eval(r["stdout"].splitlines()[-1]))  # noqa: S307 - our own output
+
+    def test_drag_example_moves_only_the_touched_circle(self):
+        pos = self._drag_example([touch("down", 210, 205), touch("move", 260, 255), touch("move", 300, 300),
+                                  touch("up", 300, 300), touch("move", 700, 500)])
+        self.assertEqual(pos["#00ffff"], (290.0, 295.0))   # keeps the grab offset
+        self.assertEqual(pos["#ff5c8a"], (400, 320))
+        self.assertEqual(pos["#ffd166"], (600, 220))
+
+    def test_drag_example_ignores_empty_space_and_handles_two_fingers(self):
+        pos = self._drag_example([touch("down", 50, 550), touch("move", 60, 560), touch("up", 60, 560),
+                                  touch("down", 200, 200, finger=1), touch("down", 600, 220, finger=2),
+                                  touch("move", 100, 100, finger=1), touch("move", 5000, 220, finger=2),
+                                  touch("up", 100, 100, finger=1), touch("cancel", 5000, 220, finger=2)])
+        self.assertEqual(pos["#00ffff"], (100.0, 100.0))
+        self.assertEqual(pos["#ffd166"], (740.0, 220.0))   # clamped to the canvas
+        self.assertEqual(pos["#ff5c8a"], (400, 320))
+
+
 class ExampleTests(GraphicsTestCase):
     def test_every_bundled_example_runs(self):
         paths = sorted(glob.glob(os.path.join(EXAMPLES, "*.py")))
-        self.assertEqual(len(paths), 12)
+        self.assertEqual(len(paths), 13)
         for path in paths:
             with self.subTest(example=os.path.basename(path)):
                 graphics.recorded.clear()

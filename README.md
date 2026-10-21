@@ -59,8 +59,8 @@ A Python IDE for iPhone and iPad. You write Python in a CodeMirror 6 editor, and
 **Graphics**
 - `import zinia_draw` for 2D drawing (shapes, lines, polygons, text) and `import zinia_3d` for 3D scenes (boxes, spheres, planes, cylinders, lights, camera, materials). See [docs/GRAPHICS.md](docs/GRAPHICS.md).
 - A Graphics preview panel beside the editor (over it on a phone) with 2D/3D modes, Run, Stop, Clear, Reset camera, zoom and fullscreen. Sharp on Retina screens; it keeps its picture through rotation and resizing.
-- Animation with `set_update()` and `run_animation()`, plus touch, Apple Pencil, keyboard and 3D tap events delivered to Python. Each frame waits until the previous one is drawn, so programs cannot freeze the app.
-- Twelve complete examples (city generator, starfield, particles, finger painting, a 2D game, rotating cube, lit scene, landscape, object viewer, a 3D game) under **⋯ › Graphics examples**.
+- Animation with `set_update()` and `run_animation()`. `on_touch()` delivers finger, Apple Pencil and mouse events (start, move, end, tap) in canvas coordinates, so you can drag what you draw; keyboard and 3D tap events too. Each frame waits until the previous one is drawn, so programs cannot freeze the app.
+- Thirteen complete examples (city generator, starfield, particles, finger painting, a 2D game, dragging circles with your fingers, rotating cube, lit scene, landscape, object viewer, a 3D game) under **⋯ › Graphics examples**.
 - Works offline: Three.js is bundled into the app.
 
 **Files and projects**
@@ -283,8 +283,8 @@ docs/                       Architecture, building, signing, packages, limitatio
 
 | Command | What it runs |
 | --- | --- |
-| `npm test` | 56 Vitest tests: paths, state machine, tabs, settings, traceback rendering (from real CPython fixtures), the runtime service against a mocked plugin, workspace files through the real Capacitor Filesystem web implementation, and the graphics preview (2D renderer, canvas fitting, run filtering and event batching, 3D scene model) |
-| `npm run test:python` | 87 tests of `python/zinia` on desktop CPython: the specification's scripts, imports, interrupts, the REPL, package installation and path-traversal protection, the bridge, and `zinia_draw`/`zinia_3d` (commands, validation, animation and events, every graphics example) |
+| `npm test` | 57 Vitest tests: paths, state machine, tabs, settings, traceback rendering (from real CPython fixtures), the runtime service against a mocked plugin, workspace files through the real Capacitor Filesystem web implementation, and the graphics preview (2D renderer, canvas fitting, run filtering and event batching, 3D scene model) |
+| `npm run test:python` | 99 tests of `python/zinia` on desktop CPython: the specification's scripts, imports, interrupts, the REPL, package installation and path-traversal protection, the bridge, and `zinia_draw`/`zinia_3d` (commands, validation, animation, touch events and dragging, every graphics example) |
 | `npm run check:ios` | 77 static checks of the Xcode project and plugin wiring |
 | `node scripts/verify-runtime.mjs` | 27 checks of the CPython iOS framework (Mach-O architectures and platforms, headers, standard library) |
 | CI simulator self-test | Real embedded CPython inside the iOS app on the Simulator |

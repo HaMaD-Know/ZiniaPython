@@ -104,6 +104,10 @@ def _strip_internal(exc: BaseException) -> None:
         entry = entry.tb_next
     if last_kept is not None:
         last_kept.tb_next = None
+    elif isinstance(exc, KeyboardInterrupt):
+        # Stopped while the runtime itself was waiting (for example listening
+        # for touches after the script's last line): no user frame to show.
+        exc.__traceback__ = None
 
 
 def _type_name(exc: BaseException) -> str:

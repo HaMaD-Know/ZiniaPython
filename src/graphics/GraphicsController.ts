@@ -121,9 +121,21 @@ export class GraphicsController {
   private push(event: UIEvent, executionId: string): void {
     if (executionId !== this.live) return;
     if (event.type === 'move') {
-      // Only the latest position of each pointer matters within one frame.
-      const index = this.queue.findIndex((e) => e.type === 'move' && e.id === event.id && e.surface === event.surface);
-      if (index >= 0) this.queue.splice(index, 1);
+      // Within one frame only the latest position of a pointer matters, but
+      // never merge across its down/up: replace a move only when it is that
+      // pointer's most recent queued event.
+      let last = -1;
+      for (let i = this.queue.length - 1; i >= 0; i -= 1) {
+        const e = this.queue[i];
+        if (e.id === event.id && e.surface === event.surface && e.type !== 'ack') {
+          last = i;
+          break;
+        }
+      }
+      if (last >= 0 && this.queue[last].type === 'move') {
+        this.queue[last] = event;
+        return;
+      }
     }
     if (event.type === 'ack') {
       this.queue = this.queue.filter((e) => !(e.type === 'ack' && e.surface === event.surface));

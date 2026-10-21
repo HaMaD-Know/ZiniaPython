@@ -1,7 +1,7 @@
 # Graphics examples
 
 Open a file and press **Run**. The Graphics preview opens by itself when a
-program draws. Programs that animate keep running until you press **Stop**.
+program draws. Programs that animate or wait for touches keep running until you press **Stop**.
 
 | File | Module | What it shows |
 | --- | --- | --- |
@@ -17,6 +17,7 @@ program draws. Programs that animate keep running until you press **Stop**.
 | `10_procedural_landscape.py` | zinia_3d | A block island built from a height map |
 | `11_object_viewer.py` | zinia_3d | Tap objects to select them |
 | `12_dodge_game.py` | zinia_3d | A small 3D game: steer with touches or arrow keys |
+| `13_drag_circles.py` | zinia_draw | Drag three circles with your fingers (`on_touch`) |
 
 These are copies: edit them freely. "Graphics examples" in the ⋯ menu adds
 any example you deleted back, and never overwrites your changes.

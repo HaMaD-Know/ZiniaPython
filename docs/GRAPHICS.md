@@ -30,7 +30,7 @@ scene.set_camera(position=(6, 5, 8), target=(0, 0, 0))
 scene.show()
 ```
 
-Twelve complete example programs are bundled with the app: **⋯ › Graphics
+Thirteen complete example programs are bundled with the app: **⋯ › Graphics
 examples** copies them into a *Graphics Examples* project (see
 [examples/graphics](../examples/graphics/README.md)).
 
@@ -113,15 +113,94 @@ gfx.run_animation(fps=60)   # runs until Stop, stop_animation() or `duration` se
 | --- | --- |
 | `set_update(function)` | `function(dt)` is called once per frame. |
 | `run_animation(fps=60, duration=None)` | Calls `update` repeatedly and sends each frame. Blocks until Stop is pressed, `stop_animation()` is called (for example from `update` or an event handler), or `duration` seconds pass. `fps` is the most frames per second to aim for (1–120). |
-| `stop_animation()` | Ends `run_animation()` after the current frame; the program continues after it. |
-| `on_pointer(function)` | Touches, Apple Pencil and mouse on the canvas. `move` events arrive while a finger is down (for a mouse, also while hovering). |
+| `stop_animation()` | Ends `run_animation()` (after the current frame) or `listen()`; the program continues after it. |
+| `on_touch(function)` | Finger, pencil and mouse events: `start`, `move`, `end`, `tap`. See *Touch* below. |
+| `listen()` | Deliver touch and key events until Stop or `stop_animation()`, without an animation loop. |
+| `on_pointer(function)` | Lower-level variant of `on_touch`: `down`, `move` (also mouse hover) and `up`, with `x`, `y`, `id`, `buttons`. |
 | `on_key(function)` | Hardware keyboard keys while the preview has focus (tap it first). |
 | `pointer()` | `(x, y, is_down)` of the most recent pointer event. |
 | `frame_rate()` | Frames per second actually achieved so far. |
 
-Events are delivered **only while `run_animation()` is running**, between
-frames, on Python's own thread, so handlers can use the same variables as
-`update` without locks.
+### Touch: dragging what you draw
+
+```python
+import zinia_draw as gfx
+
+gfx.create_canvas(800, 600)
+gfx.set_background("#101525")
+
+objects = [
+    {"x": 200, "y": 200, "radius": 45},
+    {"x": 400, "y": 300, "radius": 45},
+]
+held = {}   # finger id -> the circle it holds
+
+def draw():
+    gfx.clear()
+    for obj in objects:
+        gfx.circle(obj["x"], obj["y"], obj["radius"], color="#00ffff")
+
+def on_touch(event):
+    if event.type == "start":
+        for obj in objects:
+            if (event.x - obj["x"]) ** 2 + (event.y - obj["y"]) ** 2 <= obj["radius"] ** 2:
+                held[event.id] = obj
+                break
+    elif event.type == "move" and event.id in held:
+        held[event.id]["x"] += event.dx
+        held[event.id]["y"] += event.dy
+        draw()
+    elif event.type == "end":
+        held.pop(event.id, None)
+
+draw()
+gfx.on_touch(on_touch)
+# The script ends here, but because a touch handler is set the program keeps
+# running and receiving touches until you press Stop.
+```
+
+`on_touch(function)` registers `function(event)` for fingers, Apple Pencil
+and the mouse on the 2D canvas. Calling it again replaces the function (it
+never adds a second listener); `on_touch(None)` removes it.
+
+| `event.type` | When |
+| --- | --- |
+| `"start"` | A finger touches the canvas. |
+| `"move"` | That finger moves (only while it is down). |
+| `"end"` | That finger lifts, or iOS cancels the touch (`event.cancelled` is then `True`). Always follows a `"start"`. |
+| `"tap"` | After the `"end"` of a touch shorter than half a second that moved less than 8 points. |
+
+| Field | Meaning |
+| --- | --- |
+| `event.x`, `event.y` | Position in **canvas coordinates**, the same units as `circle()` and `rectangle()`. The preview's fit-to-panel scaling is undone, and the screen's pixel density does not matter. A finger dragged off the canvas keeps reporting (values can go below 0 or past the canvas size). |
+| `event.id` | Which finger. Each finger has its own start/move/end sequence. |
+| `event.dx`, `event.dy` | Movement since this finger's previous event (0 on `"start"`). |
+| `event.start_x`, `event.start_y` | Where this finger first touched. |
+| `event.touches` | How many fingers are on the canvas now (an ending finger no longer counts). |
+| `event.cancelled` | `True` only on an `"end"` caused by a cancelled touch. |
+| `event.pointer_type` | `"touch"`, `"pen"` or `"mouse"`. |
+
+**When events arrive.** Events are delivered between frames, on Python's
+own thread, so handlers can change the same variables as the rest of the
+program without locks. Whatever a handler draws is sent to the preview
+right after it returns.
+
+- During `run_animation()`, every frame.
+- With `listen()`, which waits for touches and keys until Stop or
+  `stop_animation()`. Use it when the picture changes only in response to
+  touches.
+- Automatically: a program that sets `on_touch()`, `on_pointer()` or
+  `on_key()` and reaches its last line without having run `run_animation()`
+  or `listen()` keeps listening until Stop, like `turtle.done()`.
+
+Several fingers at once are supported and kept apart by `event.id`; the
+example above lets each finger drag a different circle. Each new Run starts
+with no handlers and no fingers down, so events never go to an earlier
+program. An exception in a handler ends the program with a normal traceback
+pointing at the handler's line.
+
+`examples/graphics/13_drag_circles.py` is a complete version with three
+circles, grab offsets, bring-to-front and keeping circles on the canvas.
 
 ## zinia_3d (3D)
 
@@ -202,8 +281,12 @@ Resources: one WebGL context for the app session. A new run, `create_scene()`,
   view and back. Simple scenes usually reach the display's rate; thousands of
   shapes per frame or heavy Python code in `update` will be slower. The status
   line shows the measured rate. Redraw only what changes when you can.
-- **Events only during `run_animation()`.** A program that just draws and ends
-  can't react to touches. (3D orbit and zoom still work after it ends.)
+- **Events need a running program.** They are delivered during
+  `run_animation()` or `listen()`, or after the last line when a handler is
+  set. A program stopped with Stop no longer receives them. (3D orbit and
+  zoom still work after it ends.)
+- **Touch latency.** Each touch crosses from the web view to Python and the
+  redraw comes back, so a dragged shape trails the finger by a frame or two.
 - **One program at a time.** The preview shows the current run; the REPL
   draws onto it.
 - **No images, sprites, textures or 3D model files (GLB/GLTF) yet.** Shapes,
